@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: billing_re
+      POSTGRES_USER: billing_user
+      POSTGRES_PASSWORD: billing_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U billing_user -d billing_re"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  transformation-service:
+    build: ./services/transformation
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgresql://billing_user:billing_pass@postgres:5432/billing_re
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./services/transformation:/app
+      - ./shared:/app/shared
+
+  rating-service:
+    build: ./services/rating
+    ports:
+      - "3002:3002"
+    environment:
+      - DATABASE_URL=postgresql://billing_user:billing_pass@postgres:5432/billing_re
+      - REDIS_URL=redis://redis:6379
+      - ENABLE_DMN_CACHE=true
+      - DMN_CACHE_TTL=300
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./services/rating:/app
+      - ./shared:/app/shared
+
+  billing-service:
+    build: ./services/billing
+    ports:
+      - "3003:3003"
+    environment:
+      - DATABASE_URL=postgresql://billing_user:billing_pass@postgres:5432/billing_re
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./services/billing:/app
+      - ./shared:/app/shared
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://billing_user:billing_pass@postgres:5432/billing_re
+      - TRANSFORMATION_SERVICE_URL=http://transformation-service:3001
+      - RATING_SERVICE_URL=http://rating-service:3002
+      - BILLING_SERVICE_URL=http://billing-service:3003
+      - JWT_SECRET=your-jwt-secret-key
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    depends_on:
+      - transformation-service
+      - rating-service
+      - billing-service
+    volumes:
+      - ./api-gateway:/app
+
+volumes:
+  postgres_data:
+  redis_data:

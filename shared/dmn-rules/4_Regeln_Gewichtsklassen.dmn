@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/"
+             id="GewichtsklassenRegeln"
+             name="Weight Classification Rules"
+             namespace="http://billing-re.example.com/dmn">
+
+  <decision id="WeightClassification" name="Weight Classification">
+    <decisionTable id="DecisionTable_WeightClassification" hitPolicy="FIRST">
+
+      <!-- Input columns -->
+      <input id="Input_ContainerLength" label="Container Length">
+        <inputExpression id="Expression_ContainerLength" typeRef="number">
+          <text>containerLength</text>
+        </inputExpression>
+      </input>
+
+      <input id="Input_GrossWeight" label="Gross Weight">
+        <inputExpression id="Expression_GrossWeight" typeRef="number">
+          <text>grossWeight</text>
+        </inputExpression>
+      </input>
+
+      <!-- Output column -->
+      <output id="Output_WeightClass" label="Weight Class" typeRef="string"/>
+
+      <!-- Rules from roadmap Section 4: Weight Classification -->
+
+      <!-- 20ft containers -->
+      <rule id="Rule_20ft_LightWeight">
+        <inputEntry id="Rule1_ContainerLength">
+          <text>20</text>
+        </inputEntry>
+        <inputEntry id="Rule1_GrossWeight">
+          <text>&lt;= 20000</text>
+        </inputEntry>
+        <outputEntry id="Rule1_Output">
+          <text>"20A"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="Rule_20ft_HeavyWeight">
+        <inputEntry id="Rule2_ContainerLength">
+          <text>20</text>
+        </inputEntry>
+        <inputEntry id="Rule2_GrossWeight">
+          <text>&gt; 20000</text>
+        </inputEntry>
+        <outputEntry id="Rule2_Output">
+          <text>"20B"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- 40ft containers -->
+      <rule id="Rule_40ft_LightWeight">
+        <inputEntry id="Rule3_ContainerLength">
+          <text>40</text>
+        </inputEntry>
+        <inputEntry id="Rule3_GrossWeight">
+          <text>&lt;= 25000</text>
+        </inputEntry>
+        <outputEntry id="Rule3_Output">
+          <text>"40A"</text>
+        </outputEntry>
+      </rule>
+
+      <rule id="Rule_40ft_HeavyWeight">
+        <inputEntry id="Rule4_ContainerLength">
+          <text>40</text>
+        </inputEntry>
+        <inputEntry id="Rule4_GrossWeight">
+          <text>&gt; 25000</text>
+        </inputEntry>
+        <outputEntry id="Rule4_Output">
+          <text>"40B"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Default fallback -->
+      <rule id="Rule_Default">
+        <inputEntry id="Rule5_ContainerLength">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="Rule5_GrossWeight">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="Rule5_Output">
+          <text>"20A"</text>
+        </outputEntry>
+      </rule>
+
+    </decisionTable>
+  </decision>
+
+</definitions>
