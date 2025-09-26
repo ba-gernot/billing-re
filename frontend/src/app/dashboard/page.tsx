@@ -1,0 +1,196 @@
+'use client'
+
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, FileText, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react'
+import { OrderProcessorForm } from '@/components/orders/order-processor-form'
+import { RecentOrders } from '@/components/orders/recent-orders'
+import { InvoicesSummary } from '@/components/invoices/invoices-summary'
+
+export default function DashboardPage() {
+  const [showOrderForm, setShowOrderForm] = useState(false)
+
+  const dashboardStats = [
+    {
+      title: 'Orders Today',
+      value: '23',
+      change: '+12%',
+      icon: FileText,
+      color: 'blue'
+    },
+    {
+      title: 'Total Revenue',
+      value: '€12,847',
+      change: '+8.2%',
+      icon: DollarSign,
+      color: 'green'
+    },
+    {
+      title: 'Pending Invoices',
+      value: '7',
+      change: '-3',
+      icon: AlertTriangle,
+      color: 'yellow'
+    },
+    {
+      title: 'Completed Today',
+      value: '18',
+      change: '+5',
+      icon: CheckCircle,
+      color: 'green'
+    }
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">
+            Billing RE System - Transport Logistics Billing
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowOrderForm(true)}
+          className="flex items-center space-x-2"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Process Order</span>
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {dashboardStats.map((stat, index) => {
+          const Icon = stat.icon
+          return (
+            <Card key={index}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      {stat.title}
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {stat.value}
+                    </p>
+                    <p className={`text-sm ${
+                      stat.change.startsWith('+') ? 'text-green-600' :
+                      stat.change.startsWith('-') ? 'text-red-600' :
+                      'text-gray-600'
+                    }`}>
+                      {stat.change} from yesterday
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full bg-${stat.color}-100`}>
+                    <Icon className={`h-6 w-6 text-${stat.color}-600`} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="orders">Recent Orders</TabsTrigger>
+          <TabsTrigger value="invoices">Invoices</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>
+                  Common billing operations
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setShowOrderForm(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Process New Order
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <FileText className="mr-2 h-4 w-4" />
+                  View All Orders
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Generate Invoice Report
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* System Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>System Status</CardTitle>
+                <CardDescription>
+                  Service health and performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">API Gateway</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-600">Online</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Transformation Service</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-600">Online</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Rating Service</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-600">Online</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Billing Service</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-600">Online</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <RecentOrders />
+        </TabsContent>
+
+        <TabsContent value="invoices">
+          <InvoicesSummary />
+        </TabsContent>
+      </Tabs>
+
+      {/* Order Processing Form Modal */}
+      {showOrderForm && (
+        <OrderProcessorForm
+          isOpen={showOrderForm}
+          onClose={() => setShowOrderForm(false)}
+        />
+      )}
+    </div>
+  )
+}

@@ -50,6 +50,11 @@ node_modules/
 *.tgz
 .yarn-integrity
 
+# Next.js
+.next/
+out/
+.vercel/
+
 # IDEs
 .vscode/
 .idea/
