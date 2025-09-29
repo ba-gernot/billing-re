@@ -101,16 +101,70 @@ Expected result: €383 total invoice
 - [x] Base services setup
 - [x] API Gateway orchestration
 
-🔄 **Phase 2 Next**: Core Services Implementation
-- [ ] Input validation & enrichment
-- [ ] DMN rule engine integration
-- [ ] Database price lookups
+✅ **Phase 2 Complete**: Core Services Implementation
+- [x] Input validation & enrichment
+- [x] DMN rule engine integration (with XLSX processor fallback)
+- [x] Database price lookups
+- [x] Tax calculation (Export/Import/Domestic)
+
+✅ **Phase 3 Complete**: Business Rules & Pricing
+- [x] Dynamic DMN rules in XLSX format (4 rule tables)
+- [x] Weight classification (20A/20B/40A-40D)
+- [x] Service determination with COLLECT policy
+- [x] Trip type mapping (LB→Zustellung, LA→Abholung)
+- [x] Tax determination rules
+- [x] Dynamic pricing SQL generation
+- [x] €383 target calculation validated (100% pass rate)
+
+✅ **Phase 4 Complete**: Frontend & Integration
+- [x] Next.js admin portal
+- [x] E2E testing with sample order
+- [x] Business logic validation tests
+- [x] DMN rules validation suite
+
+🔄 **Phase 5 In Progress**: Production Deployment
+- [ ] AWS Lambda deployment
+- [ ] Monitoring & logging
 - [ ] PDF invoice generation
+- [ ] Performance optimization
+
+## Documentation
+
+- **Current Implementation**: See `/DMN_DYNAMIC_IMPLEMENTATION_SUMMARY.md` for DMN and pricing details
+- **Historical Context**: See `DMN_IMPLEMENTATION_DOCUMENTATION.md` for problem-solving journey
+- **Project Overview**: See `CLAUDE.md` for architecture and commands
+- **Progress Tracking**: See `Progress tracking/BILLING_RE_ROADMAP.md` for detailed roadmap
+
+## Testing
+
+### Business Logic Tests
+```bash
+python3 test_business_logic.py
+# Tests transformation, weight classification, service determination, pricing, and tax
+# Expected: €383 total, all tests passing
+```
+
+### DMN Rules Validation
+```bash
+python3 test_dmn_rules_validation.py
+# Validates all 4 DMN XLSX files contain correct rules
+# Expected: 100% pass rate (6 tests)
+```
+
+### End-to-End Integration
+```bash
+cd billing-re
+python3 test_e2e.py
+# Tests complete microservices pipeline with async calls
+# Requires all 3 services running
+```
 
 ## Development Guidelines
 
 - **Services**: Python/FastAPI for business logic
 - **Gateway**: Node.js/Fastify for orchestration
 - **Database**: PostgreSQL with full schema
+- **DMN Rules**: XLSX files in `shared/dmn-rules/` with three-layer fallback
+- **Pricing**: Dynamic SQL generation from XLSX sources
 - **Testing**: E2E scenarios with expected €383 result
 - **Deployment**: Docker containers + AWS Lambda

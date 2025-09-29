@@ -9,7 +9,9 @@ import os
 
 from database.connection import billing_db
 from generation.pdf_generator import InvoicePDFGenerator
-from loguru import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

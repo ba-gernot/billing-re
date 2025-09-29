@@ -7,7 +7,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.platypus.flowables import HRFlowable
-from loguru import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InvoicePDFGenerator:
     """Professional PDF invoice generator using ReportLab"""

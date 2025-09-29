@@ -7,14 +7,32 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 
 from database.connection import rating_db
+from rules.dmn_service_determination import DMNServiceDetermination
+from rules.dmn_weight_classification import DMNWeightClassification
+from dmn import get_dmn_engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await rating_db.initialize()
+
+    # Initialize DMN components
+    global dmn_service_determination, dmn_weight_classification, dmn_engine
+    dmn_service_determination = DMNServiceDetermination()
+    dmn_weight_classification = DMNWeightClassification()
+    dmn_engine = get_dmn_engine()
+
+    # Preload DMN rules
+    dmn_engine.reload_all_rules()
+
     yield
     # Shutdown
     await rating_db.close()
+
+# Global DMN components
+dmn_service_determination = None
+dmn_weight_classification = None
+dmn_engine = None
 
 app = FastAPI(
     title="Rating Service",
@@ -316,6 +334,250 @@ def _lookup_price(service_code: str, service_order: ServiceOrderInput) -> float:
         "456": 15.0, "789": 250.0
     }
     return price_table.get(service_code, 50.0)
+
+
+# DMN Management Endpoints
+
+@app.get("/dmn/rules")
+async def list_dmn_rules():
+    """List all available DMN rules"""
+    try:
+        available_rules = dmn_engine.list_available_rules()
+        rule_info = {}
+
+        for rule_name in available_rules:
+            info = dmn_engine.get_rule_info(rule_name)
+            if info:
+                rule_info[rule_name] = info
+
+        return {
+            "total_rules": len(available_rules),
+            "loaded_rules": len([r for r in rule_info.values() if r.get('loaded', False)]),
+            "rules": rule_info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list DMN rules: {str(e)}")
+
+
+@app.post("/dmn/reload")
+async def reload_dmn_rules():
+    """Reload all DMN rules from files"""
+    try:
+        results = dmn_engine.reload_all_rules()
+        successful = len([r for r in results.values() if r])
+        total = len(results)
+
+        return {
+            "message": f"Reloaded {successful}/{total} DMN rules",
+            "results": results,
+            "success": successful == total
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reload DMN rules: {str(e)}")
+
+
+@app.post("/dmn/reload/{rule_name}")
+async def reload_specific_dmn_rule(rule_name: str):
+    """Reload a specific DMN rule"""
+    try:
+        engine = dmn_engine.get_engine(rule_name, force_reload=True)
+        if engine:
+            return {
+                "message": f"Successfully reloaded DMN rule: {rule_name}",
+                "rule_name": rule_name,
+                "success": True
+            }
+        else:
+            raise HTTPException(status_code=404, detail=f"DMN rule not found: {rule_name}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reload DMN rule {rule_name}: {str(e)}")
+
+
+@app.delete("/dmn/cache")
+async def clear_dmn_cache():
+    """Clear DMN rule cache"""
+    try:
+        dmn_engine.clear_cache()
+        return {"message": "DMN cache cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear DMN cache: {str(e)}")
+
+
+@app.delete("/dmn/cache/{rule_name}")
+async def clear_rule_cache(rule_name: str):
+    """Clear cache for a specific DMN rule"""
+    try:
+        dmn_engine.clear_cache(rule_name)
+        return {"message": f"Cache cleared for DMN rule: {rule_name}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache for rule {rule_name}: {str(e)}")
+
+
+@app.post("/dmn/test")
+async def test_dmn_rule(rule_name: str, input_data: Dict):
+    """Test a DMN rule with custom input data"""
+    try:
+        result = dmn_engine.execute_rule(
+            rule_name=rule_name,
+            input_data=input_data,
+            use_cache=False
+        )
+
+        return {
+            "rule_name": rule_name,
+            "input_data": input_data,
+            "result": result,
+            "success": result is not None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to test DMN rule {rule_name}: {str(e)}")
+
+
+@app.get("/dmn/status")
+async def get_dmn_status():
+    """Get overall DMN system status"""
+    try:
+        service_status = dmn_service_determination.get_rule_status()
+        weight_status = dmn_weight_classification.get_rule_status()
+
+        return {
+            "dmn_engine_initialized": dmn_engine is not None,
+            "cache_enabled": dmn_engine.redis_client is not None if dmn_engine else False,
+            "service_determination": service_status,
+            "weight_classification": weight_status,
+            "available_rules": dmn_engine.list_available_rules() if dmn_engine else []
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get DMN status: {str(e)}")
+
+
+# Enhanced rating endpoint with DMN integration
+
+@app.post("/rate-dmn", response_model=RatingResult)
+async def rate_services_dmn(service_orders: List[ServiceOrderInput]):
+    """
+    Enhanced rating with DMN-based service determination and weight classification
+
+    Process:
+    1. Apply DMN service determination rules (dynamic from files)
+    2. DMN weight classification (dynamic from files)
+    3. Multi-level pricing lookup (customer-specific → fallback → hardcoded)
+    4. Calculate final amounts with business logic
+    5. Return comprehensive pricing breakdown
+    """
+    start_time = time.time()
+    warnings = []
+
+    try:
+        # Get customer information for pricing context
+        customer_data = None
+        customer_id = None
+        if service_orders:
+            customer_data = await rating_db.get_customer_by_code(service_orders[0].customer_code)
+            if customer_data:
+                customer_id = customer_data['id']
+            else:
+                warnings.append(f"Customer {service_orders[0].customer_code} not found in database")
+
+        services = []
+        total_amount = 0.0
+        all_applicable_services = []
+        rules_applied = ["DMN-based service determination", "DMN-based weight classification"]
+
+        for service_order in service_orders:
+            # Step 1: DMN-based weight classification
+            if hasattr(service_order, 'container_length') and hasattr(service_order, 'gross_weight'):
+                weight_class = dmn_weight_classification.classify_weight(
+                    container_length=getattr(service_order, 'container_length', '20'),
+                    gross_weight=getattr(service_order, 'gross_weight', 20000)
+                )
+                service_order.weight_class = weight_class
+                rules_applied.append(f"Weight classification: {weight_class}")
+
+            # Step 2: Prepare order data for DMN service determination
+            main_order = {
+                'order_reference': getattr(service_order, 'order_reference', 'ORD-DMN-TEST'),
+                'customer_code': service_order.customer_code,
+                'transport_direction': getattr(service_order, 'transport_direction', 'Export'),
+                'loading_status': service_order.loading_status or 'beladen',
+                'type_of_transport': service_order.transport_type,
+                'dangerous_goods': service_order.dangerous_goods_flag,
+                'weight_class': service_order.weight_class,
+                'gross_weight': getattr(service_order, 'gross_weight', 20000),
+                'container_length': getattr(service_order, 'container_length', '20'),
+                'departure_date': service_order.departure_date
+            } if service_order.service_type == "MAIN" else {}
+
+            trucking_orders = [{
+                'order_reference': getattr(service_order, 'order_reference', 'ORD-DMN-TEST'),
+                'trucking_code': getattr(service_order, 'trucking_code', 'LB'),
+                'station': service_order.departure_station or service_order.destination_station,
+                'trucking_type': getattr(service_order, 'trucking_type', 'Standard'),
+                'date': service_order.departure_date
+            }] if service_order.service_type == "TRUCKING" else []
+
+            additional_orders = [{
+                'order_reference': getattr(service_order, 'order_reference', 'ORD-DMN-TEST'),
+                'service_code': service_order.additional_service_code,
+                'quantity': service_order.quantity,
+                'station': service_order.departure_station,
+                'customs_type': getattr(service_order, 'customs_type', 'N1'),
+                'country': getattr(service_order, 'country', 'DE'),
+                'date': service_order.departure_date
+            }] if service_order.service_type == "ADDITIONAL" and service_order.additional_service_code else []
+
+            # Step 3: DMN-based service determination
+            determined_services = dmn_service_determination.determine_services(
+                main_order=main_order,
+                trucking_orders=trucking_orders,
+                additional_orders=additional_orders
+            )
+
+            # Step 4: For each determined service, calculate pricing
+            for service in determined_services:
+                applicable_services.append(service.service_code)
+                all_applicable_services.append(service.service_code)
+
+                pricing_result = await _calculate_service_pricing(
+                    service.service_code,
+                    service_order,
+                    customer_id,
+                    warnings
+                )
+
+                # Update pricing result with DMN metadata
+                pricing_result.description += f" (DMN: {service.metadata.get('determined_by', 'unknown')})"
+                services.append(pricing_result)
+                total_amount += pricing_result.calculated_amount
+
+                rules_applied.append(f"Service {service.service_code}: {service.metadata.get('determined_by', 'unknown')}")
+
+        processing_time = (time.time() - start_time) * 1000
+
+        # Create service determination result
+        service_determination = ServiceDeterminationResult(
+            applicable_services=list(set(all_applicable_services)),
+            rules_applied=rules_applied,
+            context={
+                "dmn_enabled": True,
+                "service_determination_method": "DMN",
+                "weight_classification_method": "DMN",
+                "fallback_available": True
+            }
+        )
+
+        return RatingResult(
+            order_reference="ORD20250617-00042",  # Should come from transformation service
+            customer_id=customer_id,
+            services=services,
+            service_determination=service_determination,
+            total_amount=total_amount,
+            processing_time_ms=processing_time,
+            warnings=warnings
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DMN-based rating failed: {str(e)}")
 
 
 if __name__ == "__main__":

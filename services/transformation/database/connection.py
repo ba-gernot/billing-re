@@ -1,7 +1,9 @@
 import os
 import asyncpg
 from typing import Optional, Dict, Any, List
-from loguru import logger
+import logging
+
+logger = logging.getLogger(__name__)
 import json
 
 class DatabaseConnection:

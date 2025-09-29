@@ -17,6 +17,7 @@ from models.service_order import (
 from validators.order_validator import OrderValidator
 from enrichers.container_enricher import ContainerEnricher
 from database.connection import db
+from rules.dmn_trip_type import DMNTripTypeClassification
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,6 +45,7 @@ app.add_middleware(
 # Initialize services
 order_validator = OrderValidator()
 container_enricher = ContainerEnricher()
+dmn_trip_type = DMNTripTypeClassification()
 
 
 @app.get("/health")
@@ -241,7 +243,16 @@ def _determine_transport_type(trucking_services: List) -> TransportType:
 
 
 def _map_trucking_code_to_trip_type(trucking_code: str) -> TypeOfTrip:
-    """Map trucking code to trip type using business rules from roadmap"""
+    """Map trucking code to trip type using DMN rules with fallback"""
+    try:
+        # Use DMN for trip type determination
+        dmn_result = dmn_trip_type.determine_trip_type(trucking_code)
+        if dmn_result:
+            return dmn_result
+    except Exception as e:
+        print(f"DMN trip type determination failed: {e}")
+
+    # Fallback to hardcoded mapping
     mapping = {
         "LB": TypeOfTrip.ZUSTELLUNG,
         "AB": TypeOfTrip.ABHOLUNG,
