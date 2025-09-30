@@ -30,6 +30,7 @@ except ImportError:
         logger.warning("XLSX DMN processor not available")
 
 
+
 class BillingDMNEngine:
     """
     DMN Engine wrapper for the billing system using pyDMNrules
