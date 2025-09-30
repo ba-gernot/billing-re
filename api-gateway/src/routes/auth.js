@@ -14,6 +14,15 @@ const refreshTokenSchema = z.object({
 
 // Simulated user database (in production, this would be Supabase)
 const DEMO_USERS = {
+  'test@test.com': {
+    userId: '7a14e8f6-21cf-45e9-a971-d747593a0a76',
+    email: 'test@test.com',
+    password: '123456', // In production: bcrypt hashed
+    role: 'SYSTEM_ADMIN',
+    name: 'Test Administrator',
+    customerIds: [],
+    permissions: { all: true }
+  },
   'admin@billing-re.com': {
     userId: '550e8400-e29b-41d4-a716-446655440001',
     email: 'admin@billing-re.com',

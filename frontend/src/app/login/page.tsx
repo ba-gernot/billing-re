@@ -25,6 +25,7 @@ interface DemoUser {
   email: string
   role: string
   name: string
+  password: string
   loginHint: string
 }
 
@@ -75,9 +76,8 @@ export default function LoginPage() {
   }
 
   const fillDemoUser = (user: DemoUser) => {
-    const password = user.role.toLowerCase() + '123'
     form.setValue('email', user.email)
-    form.setValue('password', password)
+    form.setValue('password', user.password)
     form.setValue('role', user.role)
   }
 
