@@ -93,7 +93,10 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
   })
 
   const onSubmit = async (data: OrderForm) => {
+    console.log('[OrderProcessor] Starting form submission')
+    console.log('[OrderProcessor] Form data:', data)
     setIsLoading(true)
+
     try {
       // Transform form data to API format
       const orderData = {
@@ -113,38 +116,60 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
         },
       }
 
+      console.log('[OrderProcessor] Transformed order data:', orderData)
+      console.log('[OrderProcessor] Calling API to process order...')
       const response = await orderApi.processOrder(orderData)
+      console.log('[OrderProcessor] API response:', response)
+
       setResult(response)
       toast.success('Order processed successfully!')
     } catch (error) {
+      console.error('[OrderProcessor] Error processing order:', error)
       const apiError = error as ApiError
+      console.error('[OrderProcessor] API error details:', apiError.response?.data)
       toast.error(apiError.response?.data?.error?.message || 'Order processing failed')
     } finally {
       setIsLoading(false)
+      console.log('[OrderProcessor] Form submission complete')
     }
   }
 
   const processJsonOrder = async () => {
+    console.log('[OrderProcessor] Starting JSON order processing')
+
     if (!jsonInput.trim()) {
+      console.warn('[OrderProcessor] No JSON input provided')
       toast.error('Please enter JSON order data')
       return
     }
 
+    console.log('[OrderProcessor] Raw JSON input:', jsonInput)
     setIsLoading(true)
+
     try {
       const orderData = JSON.parse(jsonInput)
+      console.log('[OrderProcessor] Parsed order data:', orderData)
+
+      console.log('[OrderProcessor] Calling API to process order...')
       const response = await orderApi.processOrder(orderData)
+      console.log('[OrderProcessor] API response:', response)
+
       setResult(response)
       toast.success('Order processed successfully!')
     } catch (error) {
+      console.error('[OrderProcessor] Error processing order:', error)
+
       if (error instanceof SyntaxError) {
+        console.error('[OrderProcessor] JSON syntax error:', error.message)
         toast.error('Invalid JSON format')
       } else {
         const apiError = error as ApiError
+        console.error('[OrderProcessor] API error:', apiError.response?.data)
         toast.error(apiError.response?.data?.error?.message || 'Order processing failed')
       }
     } finally {
       setIsLoading(false)
+      console.log('[OrderProcessor] Processing complete')
     }
   }
 
