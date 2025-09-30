@@ -107,4 +107,5 @@ invoices/
 # Credentials and secrets
 credentials.json
 serviceAccountKey.json
-.credentials/
+.credentials/.env
+.mcp.json

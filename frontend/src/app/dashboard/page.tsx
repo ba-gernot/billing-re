@@ -9,6 +9,28 @@ import { OrderProcessorForm } from '@/components/orders/order-processor-form'
 import { RecentOrders } from '@/components/orders/recent-orders'
 import { InvoicesSummary } from '@/components/invoices/invoices-summary'
 
+// Color class mappings for Tailwind JIT compilation
+const colorClasses = {
+  blue: {
+    bg: 'bg-blue-100',
+    text: 'text-blue-600',
+  },
+  green: {
+    bg: 'bg-green-100',
+    text: 'text-green-600',
+  },
+  yellow: {
+    bg: 'bg-yellow-100',
+    text: 'text-yellow-600',
+  },
+  red: {
+    bg: 'bg-red-100',
+    text: 'text-red-600',
+  },
+} as const
+
+type ColorKey = keyof typeof colorClasses
+
 export default function DashboardPage() {
   const [showOrderForm, setShowOrderForm] = useState(false)
 
@@ -18,28 +40,28 @@ export default function DashboardPage() {
       value: '23',
       change: '+12%',
       icon: FileText,
-      color: 'blue'
+      color: 'blue' as ColorKey
     },
     {
       title: 'Total Revenue',
       value: '€12,847',
       change: '+8.2%',
       icon: DollarSign,
-      color: 'green'
+      color: 'green' as ColorKey
     },
     {
       title: 'Pending Invoices',
       value: '7',
       change: '-3',
       icon: AlertTriangle,
-      color: 'yellow'
+      color: 'yellow' as ColorKey
     },
     {
       title: 'Completed Today',
       value: '18',
       change: '+5',
       icon: CheckCircle,
-      color: 'green'
+      color: 'green' as ColorKey
     }
   ]
 
@@ -85,8 +107,8 @@ export default function DashboardPage() {
                       {stat.change} from yesterday
                     </p>
                   </div>
-                  <div className={`p-3 rounded-full bg-${stat.color}-100`}>
-                    <Icon className={`h-6 w-6 text-${stat.color}-600`} />
+                  <div className={`p-3 rounded-full ${colorClasses[stat.color].bg}`}>
+                    <Icon className={`h-6 w-6 ${colorClasses[stat.color].text}`} />
                   </div>
                 </div>
               </CardContent>

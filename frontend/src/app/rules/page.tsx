@@ -403,7 +403,7 @@ export default function RulesPage() {
                           <Badge>20A</Badge>
                         </div>
                         <div className="flex justify-between">
-                          <span>>20 tons:</span>
+                          <span>{'>'} 20 tons:</span>
                           <Badge>20B</Badge>
                         </div>
                       </div>
@@ -418,7 +418,7 @@ export default function RulesPage() {
                           <Badge>40A</Badge>
                         </div>
                         <div className="flex justify-between">
-                          <span>>25 tons:</span>
+                          <span>{'>'} 25 tons:</span>
                           <Badge>40B</Badge>
                         </div>
                       </div>

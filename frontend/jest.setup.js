@@ -2,22 +2,16 @@ import '@testing-library/jest-dom'
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
-  useRouter() {
-    return {
-      push: jest.fn(),
-      replace: jest.fn(),
-      prefetch: jest.fn(),
-      pathname: '/',
-      query: {},
-      asPath: '/',
-    }
-  },
-  usePathname() {
-    return '/'
-  },
-  useSearchParams() {
-    return new URLSearchParams()
-  },
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    pathname: '/',
+    query: {},
+    asPath: '/',
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 // Mock localStorage
@@ -27,28 +21,52 @@ const localStorageMock = {
   removeItem: jest.fn(),
   clear: jest.fn(),
 }
-global.localStorage = localStorageMock
+Object.defineProperty(global, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+})
 
 // Mock axios
 jest.mock('axios', () => ({
+  default: {
+    create: jest.fn(() => ({
+      interceptors: {
+        request: { use: jest.fn(), eject: jest.fn() },
+        response: { use: jest.fn(), eject: jest.fn() },
+      },
+      get: jest.fn(),
+      post: jest.fn(),
+      put: jest.fn(),
+      delete: jest.fn(),
+      patch: jest.fn(),
+    })),
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+    patch: jest.fn(),
+  },
   create: jest.fn(() => ({
     interceptors: {
-      request: { use: jest.fn() },
-      response: { use: jest.fn() },
+      request: { use: jest.fn(), eject: jest.fn() },
+      response: { use: jest.fn(), eject: jest.fn() },
     },
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
     delete: jest.fn(),
+    patch: jest.fn(),
   })),
   get: jest.fn(),
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
+  patch: jest.fn(),
 }))
 
 // Mock zustand
 jest.mock('zustand', () => ({
+  default: jest.fn((fn) => fn),
   create: jest.fn((fn) => fn),
 }))
 

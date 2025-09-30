@@ -69,6 +69,9 @@ npm test            # Run Jest tests
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload --port [3001|3002|3003]
+pytest                    # Run all tests in service
+pytest test_file.py       # Run specific test file
+pytest -k test_name       # Run specific test by name
 ```
 
 ### Full System Setup
@@ -195,9 +198,17 @@ billing-re/
 - **Update Process**: Edit XLSX → Run generator → Load SQL → Prices updated
 
 ## Testing
-- **Business Logic**: `billing-re/test_business_logic.py` - Unit tests without services
-- **E2E Integration**: `billing-re/test_e2e.py` - Full pipeline with async calls
-- **DMN Validation**: `test_dmn_rules_validation.py` - XLSX content validation
+
+### Root-Level Tests
+```bash
+python3 test_business_logic.py        # Unit tests without services running
+python3 test_e2e.py                   # Full pipeline (requires all services)
+python3 tests/test_dmn_rules_validation.py  # XLSX content validation
+```
+
+- **Business Logic**: `test_business_logic.py` - Unit tests without services
+- **E2E Integration**: `test_e2e.py` - Full pipeline with async calls
+- **DMN Validation**: `tests/test_dmn_rules_validation.py` - XLSX content validation
 - **Expected Result**: €383 total for sample order
 
 ## Important Notes

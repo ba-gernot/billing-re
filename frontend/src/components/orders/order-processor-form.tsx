@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -45,6 +45,7 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [jsonInput, setJsonInput] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
@@ -401,12 +402,36 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
 
             <TabsContent value="file" className="space-y-4">
               <div className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <div
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const file = e.dataTransfer.files?.[0]
+                    if (file && file.type === 'application/json') {
+                      const reader = new FileReader()
+                      reader.onload = (event) => {
+                        setJsonInput(event.target?.result as string)
+                      }
+                      reader.readAsText(file)
+                    } else {
+                      toast.error('Please upload a valid JSON file')
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.currentTarget.classList.add('border-blue-400', 'bg-blue-50')
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50')
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <p className="mt-2 text-sm text-gray-600">
                     Drag and drop a JSON file, or click to select
                   </p>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".json"
                     className="hidden"
@@ -421,7 +446,15 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
                       }
                     }}
                   />
-                  <Button variant="outline" className="mt-2">
+                  <Button
+                    variant="outline"
+                    className="mt-2"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      fileInputRef.current?.click()
+                    }}
+                  >
                     Select File
                   </Button>
                 </div>
