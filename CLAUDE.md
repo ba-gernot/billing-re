@@ -219,3 +219,4 @@ python3 tests/test_dmn_rules_validation.py  # XLSX content validation
 - Maximum 10MB request size, 1000 records per API response
 - Always use python3 in this project
 - DMN files must be in `billing-re/shared/dmn-rules/` (not root-level)
+- When there is a `frontend` issue in hand, use the `~.claude/agents/frontend-developer.md`

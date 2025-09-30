@@ -19,7 +19,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { orderApi } from '@/lib/api'
 import { toast } from 'sonner'
-import { FileText, Upload, Code } from 'lucide-react'
+import { FileText, Upload } from 'lucide-react'
+
+interface ProcessingResult {
+  invoice?: {
+    invoice_number: string
+    total: string | number
+    currency: string
+    pdf_path?: string
+  }
+  orchestration?: {
+    traceId: string
+    totalProcessingTime: number
+    stageResults?: Record<string, {
+      success: boolean
+      processingTime: number
+    }>
+  }
+  warnings?: string[]
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      error?: {
+        message: string
+      }
+    }
+  }
+}
 
 const orderSchema = z.object({
   orderReference: z.string().min(1, 'Order reference is required'),
@@ -43,8 +71,9 @@ interface OrderProcessorFormProps {
 
 export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<ProcessingResult | null>(null)
   const [jsonInput, setJsonInput] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<OrderForm>({
@@ -87,8 +116,9 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
       const response = await orderApi.processOrder(orderData)
       setResult(response)
       toast.success('Order processed successfully!')
-    } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || 'Order processing failed')
+    } catch (error) {
+      const apiError = error as ApiError
+      toast.error(apiError.response?.data?.error?.message || 'Order processing failed')
     } finally {
       setIsLoading(false)
     }
@@ -106,11 +136,12 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
       const response = await orderApi.processOrder(orderData)
       setResult(response)
       toast.success('Order processed successfully!')
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof SyntaxError) {
         toast.error('Invalid JSON format')
       } else {
-        toast.error(error.response?.data?.error?.message || 'Order processing failed')
+        const apiError = error as ApiError
+        toast.error(apiError.response?.data?.error?.message || 'Order processing failed')
       }
     } finally {
       setIsLoading(false)
@@ -201,7 +232,7 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
                           <div className="mt-2">
                             <p><strong>Stage Results:</strong></p>
                             <ul className="ml-4 mt-1">
-                              {Object.entries(result.orchestration.stageResults).map(([stage, details]: [string, any]) => (
+                              {Object.entries(result.orchestration.stageResults).map(([stage, details]) => (
                                 <li key={stage}>
                                   {stage}: {details.success ? '✅' : '❌'} ({details.processingTime}ms)
                                 </li>
@@ -403,9 +434,12 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
             <TabsContent value="file" className="space-y-4">
               <div className="space-y-4">
                 <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+                    isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                  }`}
                   onDrop={(e) => {
                     e.preventDefault()
+                    setIsDragging(false)
                     const file = e.dataTransfer.files?.[0]
                     if (file && file.type === 'application/json') {
                       const reader = new FileReader()
@@ -419,10 +453,10 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
                   }}
                   onDragOver={(e) => {
                     e.preventDefault()
-                    e.currentTarget.classList.add('border-blue-400', 'bg-blue-50')
+                    setIsDragging(true)
                   }}
-                  onDragLeave={(e) => {
-                    e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50')
+                  onDragLeave={() => {
+                    setIsDragging(false)
                   }}
                   onClick={() => fileInputRef.current?.click()}
                 >
