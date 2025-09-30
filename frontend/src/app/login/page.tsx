@@ -40,7 +40,7 @@ export default function LoginPage() {
     defaultValues: {
       email: '',
       password: '',
-      role: '',
+      role: undefined,
     },
   })
 
@@ -65,7 +65,13 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true)
     try {
-      await login(data)
+      // Remove empty role field to avoid validation error
+      const credentials = {
+        email: data.email,
+        password: data.password,
+        ...(data.role && data.role.trim() !== '' && { role: data.role })
+      }
+      await login(credentials)
       toast.success('Login successful!')
       router.push('/dashboard')
     } catch (error: any) {

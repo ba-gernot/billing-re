@@ -26,7 +26,8 @@ const PROTECTED_ROUTES = {
 const PUBLIC_ROUTES = [
   '/health',
   '/health/services',
-  '/api/v1/auth/login'
+  '/api/v1/auth/login',
+  '/api/v1/auth/demo-users'
 ];
 
 async function authMiddleware(request, reply) {

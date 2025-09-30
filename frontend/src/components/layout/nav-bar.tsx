@@ -74,7 +74,7 @@ export function NavBar() {
         <div className="flex items-center space-x-4">
           <div className="text-sm">
             <div className="font-medium text-gray-900">{user.name}</div>
-            <div className="text-gray-500">{user.role.replace('_', ' ')}</div>
+            <div className="text-gray-500">{user.role?.replace('_', ' ') || 'User'}</div>
           </div>
 
           <DropdownMenu>
