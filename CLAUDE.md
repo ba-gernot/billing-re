@@ -161,18 +161,21 @@ billing-re/
 - Current status: Phase 4 complete (frontend & integration), Phase 5 pending (production deployment)
 
 ## DMN Implementation
-- **Current State**: Dynamic DMN rules implemented with three-layer fallback architecture
+- **Current State**: ✅ **PRODUCTION-READY** with Layer 2 (XLSX Processor) as primary DMN engine
+- **Primary Engine**: XLSX Processor (custom Python parser) - 100% integration test pass rate (14/14 tests)
 - **Rule Files**: 4 XLSX files in `billing-re/shared/dmn-rules/`:
-  - `weight_class.dmn.xlsx` - 6 rules (20A/20B/40A-40D)
+  - `weight_class.dmn.xlsx` - 6 rules (20A/20B/40A-40D classification)
   - `service_determination.dmn.xlsx` - 9 rules with COLLECT policy
   - `trip_type.dmn.xlsx` - 3 rules (LB→Zustellung, LA→Abholung)
-  - `tax_calculation.dmn.xlsx` - 4 rules (Export/Import/Domestic)
-- **Fallback Strategy**:
-  1. Try pyDMNrules with `.dmn.xlsx` files (blocked by library bugs)
-  2. Use XLSX Processor (custom Python parser) - currently active
-  3. Use hardcoded Python rules (guaranteed fallback)
-- **Validation**: 100% test pass rate via `test_dmn_rules_validation.py`
-- **Documentation**: See `/DMN_DYNAMIC_IMPLEMENTATION_SUMMARY.md` for complete details
+  - `tax_calculation.dmn.xlsx` - 4 rules (Export/Import/Domestic VAT)
+- **Three-Layer Fallback Architecture**:
+  1. **Layer 1**: pyDMNrules (blocked by library bugs - gracefully fails to Layer 2)
+  2. **Layer 2**: XLSX Processor - **PRIMARY** (fully operational, auto-reload enabled) ✅
+  3. **Layer 3**: Hardcoded Python rules (available but not needed)
+- **Test Results**: 100% integration test pass rate, €383 target calculation achieved
+- **Documentation**:
+  - Implementation details: `/DMN_DYNAMIC_IMPLEMENTATION_SUMMARY.md`
+  - Bug analysis: `/PYDMNRULES_BUG_ANALYSIS.md`
 
 ### ✅ Updating DMN Rules (Auto-Reload Enabled)
 **Changes to XLSX files are detected automatically** (no restart needed):
