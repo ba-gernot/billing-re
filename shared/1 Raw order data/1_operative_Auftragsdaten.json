@@ -52,11 +52,7 @@
 				]	 
 			 }		 
          ],
-         "AdditionalServices": [
-             {
-                 "Code": "123"
-             }
-         ],
+         "AdditionalServices": [],
          "DangerousGoodFlag": "J"
      }
   }
