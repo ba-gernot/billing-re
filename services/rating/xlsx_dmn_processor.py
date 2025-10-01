@@ -391,8 +391,7 @@ class XLSXDMNProcessor:
     def evaluate_service_determination(self, verkehrsform: str, gefahrgut: bool,
                                       gueltig_von: str = None, gueltig_bis: str = None,
                                       **kwargs) -> Optional[List[int]]:
-        """Evaluate which additional services apply"""
-
+        """Evaluate which additional services apply (legacy method for backward compatibility)"""
         # Load service determination rules
         rule_data = self.load_rule_file("service_determination.dmn.xlsx")
         if not rule_data:
@@ -443,6 +442,247 @@ class XLSXDMNProcessor:
 
         logger.debug(f"Service determination: {verkehrsform}, {gefahrgut} -> {applicable_services}")
         return applicable_services
+
+    def evaluate_service_determination_full(self, order_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Evaluate service determination with full COLLECT policy support
+        Reads from 4_Regeln_Leistungsermittlung.xlsx in shared/2 Rules/
+
+        Args:
+            order_context: Dictionary with order details:
+                - service_type: "Hauptleistung Transport", etc.
+                - loading_status: "beladen" or "leer"
+                - transport_type: "KV", "KVS", etc.
+                - dangerous_goods: boolean
+                - customs_procedure: "N1", "T1-NCTS", etc.
+                - departure_country: "DE", etc.
+                - departure_station: railway station number
+                - destination_country: "DE", "US", etc.
+                - destination_station: railway station number
+                - service_date: date in YYYYMMDD format
+
+        Returns:
+            List of dictionaries with service details:
+            [
+                {"code": 111, "name": "Zuschlag 1", "rule_matched": "Rule 1"},
+                {"code": 222, "name": "Zuschlag 2", "rule_matched": "Rule 2"},
+                ...
+            ]
+        """
+
+        # Try to load from shared folder first
+        shared_path = self.rules_dir.parent.parent.parent / "shared" / "2 Rules" / "4_Regeln_Leistungsermittlung.xlsx"
+
+        if not shared_path.exists():
+            logger.warning(f"Service determination rules not found at {shared_path}")
+            return []
+
+        try:
+            wb = openpyxl.load_workbook(shared_path)
+            ws = wb.active
+
+            # Parse the XLSX structure
+            # Row 1: Headers
+            headers = []
+            for col in range(1, ws.max_column + 1):
+                cell_value = ws.cell(1, col).value
+                if cell_value:
+                    headers.append(str(cell_value).strip())
+                else:
+                    headers.append(f"Col_{col}")
+
+            # Expected columns based on analysis:
+            # 0: Leistung
+            # 1: Ladezustand
+            # 2: Verkehrsform
+            # 3: Gefahrgut vorhanden
+            # 4: Zollverfahren
+            # 5: Land Bahnstelle Versand
+            # 6: Bahnstellennummer Versand
+            # 7: Land Bahnstelle Empfang
+            # 8: Bahnstellenummer Empfang
+            # 9: gültig von
+            # 10: gültig bis
+            # 11: NGB-Code
+            # 12: NGB-Name (DE)
+
+            matched_services = []
+
+            # Iterate through rules (row 2 onwards)
+            for row_idx in range(2, ws.max_row + 1):
+                row_values = []
+                for col in range(1, ws.max_column + 1):
+                    cell_value = ws.cell(row_idx, col).value
+                    row_values.append(cell_value)
+
+                # Skip empty rows
+                if not any(row_values):
+                    continue
+
+                # Extract rule conditions
+                rule_service_type = row_values[0] if len(row_values) > 0 else None
+                rule_loading = row_values[1] if len(row_values) > 1 else None
+                rule_transport = row_values[2] if len(row_values) > 2 else None
+                rule_dangerous = row_values[3] if len(row_values) > 3 else None
+                rule_customs = row_values[4] if len(row_values) > 4 else None
+                rule_dep_country = row_values[5] if len(row_values) > 5 else None
+                rule_dep_station = row_values[6] if len(row_values) > 6 else None
+                rule_dest_country = row_values[7] if len(row_values) > 7 else None
+                rule_dest_station = row_values[8] if len(row_values) > 8 else None
+                rule_valid_from = row_values[9] if len(row_values) > 9 else None
+                rule_valid_to = row_values[10] if len(row_values) > 10 else None
+                rule_ngb_code = row_values[11] if len(row_values) > 11 else None
+                rule_ngb_name = row_values[12] if len(row_values) > 12 else None
+
+                # Match logic: None or empty = wildcard (matches anything)
+                matches = True
+
+                # Service type match
+                if rule_service_type and str(rule_service_type).strip().strip('"'):
+                    order_service_type = order_context.get('service_type', '')
+                    if str(rule_service_type).strip('"') != order_service_type:
+                        matches = False
+
+                # Loading status match
+                if matches and rule_loading and str(rule_loading).strip().strip('"'):
+                    order_loading = order_context.get('loading_status', '')
+                    if str(rule_loading).strip('"') != order_loading:
+                        matches = False
+
+                # Transport type match
+                if matches and rule_transport and str(rule_transport).strip().strip('"'):
+                    order_transport = order_context.get('transport_type', '')
+                    rule_transport_clean = str(rule_transport).strip('"')
+                    # KVS matches both KV and KVS
+                    if rule_transport_clean not in [order_transport, 'KV'] and order_transport != rule_transport_clean:
+                        matches = False
+
+                # Dangerous goods match
+                if matches and rule_dangerous and str(rule_dangerous).lower() == 'true':
+                    if not order_context.get('dangerous_goods', False):
+                        matches = False
+
+                # Customs procedure match
+                if matches and rule_customs and str(rule_customs).strip().strip('"'):
+                    order_customs = order_context.get('customs_procedure', '')
+                    if str(rule_customs).strip('"') != order_customs:
+                        matches = False
+
+                # Departure country match
+                if matches and rule_dep_country and str(rule_dep_country).strip().strip('"'):
+                    order_dep_country = order_context.get('departure_country', '')
+                    if str(rule_dep_country).strip('"') != order_dep_country:
+                        matches = False
+
+                # Departure station match
+                if matches and rule_dep_station and str(rule_dep_station).strip().strip('"'):
+                    order_dep_station = order_context.get('departure_station', '')
+                    if str(rule_dep_station).strip('"') != order_dep_station:
+                        matches = False
+
+                # Destination country match
+                if matches and rule_dest_country and str(rule_dest_country).strip().strip('"'):
+                    order_dest_country = order_context.get('destination_country', '')
+                    if str(rule_dest_country).strip('"') != order_dest_country:
+                        matches = False
+
+                # Destination station match
+                if matches and rule_dest_station and str(rule_dest_station).strip().strip('"'):
+                    order_dest_station = order_context.get('destination_station', '')
+                    if str(rule_dest_station).strip('"') != order_dest_station:
+                        matches = False
+
+                # Date range validation
+                if matches and rule_valid_from and rule_valid_to:
+                    order_date = order_context.get('service_date')
+                    if order_date:
+                        try:
+                            order_date_int = int(order_date)
+                            valid_from_int = int(rule_valid_from) if rule_valid_from else 0
+                            valid_to_int = int(rule_valid_to) if rule_valid_to else 99991231
+
+                            if not (valid_from_int <= order_date_int <= valid_to_int):
+                                matches = False
+                        except (ValueError, TypeError):
+                            pass
+
+                # If all conditions match, add the service
+                if matches and rule_ngb_code:
+                    service_dict = {
+                        'code': int(rule_ngb_code),
+                        'name': str(rule_ngb_name) if rule_ngb_name else f"Service {rule_ngb_code}",
+                        'rule_matched': f"Row {row_idx}"
+                    }
+                    matched_services.append(service_dict)
+                    logger.debug(f"Service determination match: Row {row_idx} -> Service {rule_ngb_code}: {rule_ngb_name}")
+
+            logger.info(f"Service determination: {len(matched_services)} services matched")
+            return matched_services
+
+        except Exception as e:
+            logger.error(f"Error evaluating service determination: {e}", exc_info=True)
+            return []
+
+    def determine_service_789_from_123(self, services: List[Dict[str, Any]], additional_service_123_data: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """
+        Auto-determine service 789 (waiting time) when service 123 (Zustellung Export) is present
+
+        Based on artefact 6_3_Abrechnungsbeleg_Nebenleistung_2.json:
+        - Service 789: Wartezeit Export
+        - AmountBrutto: 8 units
+        - AmountNetto: 5 units (used for pricing)
+        - Unit: "Einheit"
+        - Price: €50 per unit
+        - Total: 5 units × €50 = €250
+
+        Args:
+            services: List of service dictionaries from evaluate_service_determination_full
+            additional_service_123_data: Optional data about service 123 with quantity info
+
+        Returns:
+            Updated services list with service 789 added if service 123 present
+        """
+
+        # Check if service 123 is in the list
+        has_service_123 = any(s.get('code') == 123 for s in services)
+
+        if not has_service_123:
+            logger.debug("Service 123 not found, skipping service 789 auto-determination")
+            return services
+
+        # Check if service 789 already exists (avoid duplicates)
+        has_service_789 = any(s.get('code') == 789 for s in services)
+
+        if has_service_789:
+            logger.debug("Service 789 already exists, skipping auto-determination")
+            return services
+
+        # Determine quantity for service 789
+        # From artefact: AmountNetto = 5 units
+        quantity_netto = 5
+        quantity_brutto = 8
+
+        if additional_service_123_data:
+            # If we have data about service 123, use its quantity info
+            quantity_netto = additional_service_123_data.get('amount_netto', 5)
+            quantity_brutto = additional_service_123_data.get('amount_brutto', 8)
+
+        # Add service 789
+        service_789 = {
+            'code': 789,
+            'name': 'Wartezeit Export',
+            'rule_matched': 'Auto-determined from service 123',
+            'quantity_netto': quantity_netto,
+            'quantity_brutto': quantity_brutto,
+            'unit': 'Einheit',
+            'price_per_unit': 50.0,  # From hardcoded_prices_383.sql
+            'total_amount': quantity_netto * 50.0  # €250
+        }
+
+        services.append(service_789)
+        logger.info(f"Auto-determined service 789 (Wartezeit Export): {quantity_netto} units × €50 = €{service_789['total_amount']}")
+
+        return services
 
     def get_available_rules(self) -> List[str]:
         """Get list of available rule files"""

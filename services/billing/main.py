@@ -9,9 +9,13 @@ import os
 
 from database.connection import billing_db
 from generation.pdf_generator import InvoicePDFGenerator
+from xlsx_tax_processor import XLSXTaxProcessor
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Initialize XLSX tax processor
+tax_processor = XLSXTaxProcessor()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +64,12 @@ class BillingInput(BaseModel):
     departure_date: Optional[str] = None
     line_items: List[BillingLineItem]
     operational_order_id: Optional[str] = None
+    # Tax calculation fields
+    departure_country: Optional[str] = "DE"
+    destination_country: Optional[str] = None
+    vat_id: Optional[str] = None
+    customs_procedure: Optional[str] = None
+    loading_status: Optional[str] = "beladen"
 
 
 class TaxCalculationResult(BaseModel):
@@ -130,12 +140,13 @@ async def generate_invoice(billing_input: BillingInput):
         # Step 3: Calculate subtotal
         subtotal = sum(item.total_price for item in aggregation_result.grouped_items)
 
-        # Step 4: Advanced tax calculation using database rules
+        # Step 4: Advanced tax calculation using XLSX rules
         tax_calculation = await _calculate_advanced_tax(
             billing_input.transport_direction,
             subtotal,
             customer_data,
-            warnings
+            warnings,
+            billing_input  # Pass full input for XLSX processor
         )
 
         # Step 5: Calculate total
@@ -310,49 +321,104 @@ async def _aggregate_documents(line_items: List[BillingLineItem]) -> DocumentAgg
 
 
 async def _calculate_advanced_tax(transport_direction: str, subtotal: float,
-                                 customer_data: Dict, warnings: List[str]) -> TaxCalculationResult:
+                                 customer_data: Dict, warnings: List[str],
+                                 billing_input: BillingInput = None) -> TaxCalculationResult:
     """
-    Advanced tax calculation using database rules for 3 scenarios from roadmap:
+    Advanced tax calculation using XLSX rules for 3 scenarios from roadmap:
     1. Export: 0% VAT (§4 No. 3a UStG)
     2. Import: Reverse charge mechanism
     3. Domestic: 19% German VAT
+
+    Primary: XLSX processor (shared/2 Rules/3_1_Regeln_Steuerberechnung.xlsx)
+    Fallback: Database rules or hardcoded rules
     """
 
     # Get customer country for tax context
     customer_country = customer_data.get("country_code", "DE")
 
-    # Database-driven tax rule lookup
-    tax_rule = await billing_db.get_tax_rules(
-        transport_direction=transport_direction,
-        from_country="DE",  # Assume German origin
-        to_country=customer_country
-    )
+    # Try XLSX processor first
+    if billing_input:
+        try:
+            destination_country = billing_input.destination_country or customer_country
+            tax_result = tax_processor.calculate_tax_for_transport(
+                transport_direction=transport_direction,
+                departure_country=billing_input.departure_country or "DE",
+                destination_country=destination_country,
+                vat_id=billing_input.vat_id,
+                customs_procedure=billing_input.customs_procedure,
+                loading_status=billing_input.loading_status or "beladen"
+            )
 
-    if tax_rule:
-        # Use database rule
-        tax_case = tax_rule["tax_case"]
-        tax_rate = float(tax_rule["tax_rate"])
-        tax_description = tax_rule["description"]
-        applicable_rule = tax_rule["rule_name"]
-    else:
-        # Fallback to hardcoded roadmap rules
-        warnings.append("Using fallback tax rules - database rules not found")
+            if tax_result:
+                logger.info(f"Tax calculated via XLSX: {tax_result['tax_case']} ({tax_result['rule_matched']})")
 
-        if transport_direction == "Export":
-            tax_case = "§4 No. 3a UStG"
-            tax_rate = 0.0
-            tax_description = "Export transactions VAT exempt according to German tax law"
-            applicable_rule = "Export VAT Exemption (fallback)"
-        elif transport_direction == "Import":
-            tax_case = "Reverse charge"
-            tax_rate = 0.0
-            tax_description = "Import reverse charge mechanism - VAT handled by recipient"
-            applicable_rule = "Import Reverse Charge (fallback)"
-        else:  # Domestic
-            tax_case = "Standard VAT"
-            tax_rate = 0.19
-            tax_description = "Domestic German VAT 19%"
-            applicable_rule = "Domestic Standard VAT (fallback)"
+                # Map XLSX result to TaxCalculationResult
+                tax_amount = subtotal * tax_result['tax_rate']
+
+                # Build description
+                description_parts = [tax_result['tax_case']]
+                if tax_result.get('sap_vat_indicator'):
+                    description_parts.append(f"SAP: {tax_result['sap_vat_indicator']}")
+
+                return TaxCalculationResult(
+                    tax_case=tax_result['tax_case'],
+                    tax_rate=tax_result['tax_rate'],
+                    tax_amount=tax_amount,
+                    tax_description=' - '.join(description_parts),
+                    applicable_rule=f"XLSX Rule ({tax_result['rule_matched']})"
+                )
+        except Exception as e:
+            logger.warning(f"XLSX tax processor failed: {e}", exc_info=True)
+            warnings.append(f"XLSX tax processor failed: {e}")
+
+    # Fallback: Try database-driven tax rule lookup
+    try:
+        tax_rule = await billing_db.get_tax_rules(
+            transport_direction=transport_direction,
+            from_country="DE",  # Assume German origin
+            to_country=customer_country
+        )
+
+        if tax_rule:
+            # Use database rule
+            tax_case = tax_rule["tax_case"]
+            tax_rate = float(tax_rule["tax_rate"])
+            tax_description = tax_rule["description"]
+            applicable_rule = tax_rule["rule_name"]
+            tax_amount = subtotal * tax_rate
+
+            logger.info(f"Tax calculated via database: {tax_case}")
+
+            return TaxCalculationResult(
+                tax_case=tax_case,
+                tax_rate=tax_rate,
+                tax_amount=tax_amount,
+                tax_description=tax_description,
+                applicable_rule=f"Database Rule: {applicable_rule}"
+            )
+    except Exception as e:
+        logger.warning(f"Database tax lookup failed: {e}")
+        warnings.append(f"Database tax lookup failed: {e}")
+
+    # Final fallback to hardcoded roadmap rules
+    warnings.append("Using hardcoded fallback tax rules")
+    logger.warning("Using hardcoded fallback tax rules")
+
+    if transport_direction == "Export":
+        tax_case = "§4 No. 3a UStG"
+        tax_rate = 0.0
+        tax_description = "Export transactions VAT exempt according to German tax law"
+        applicable_rule = "Export VAT Exemption (fallback)"
+    elif transport_direction == "Import":
+        tax_case = "Reverse charge"
+        tax_rate = 0.0
+        tax_description = "Import reverse charge mechanism - VAT handled by recipient"
+        applicable_rule = "Import Reverse Charge (fallback)"
+    else:  # Domestic
+        tax_case = "Standard VAT"
+        tax_rate = 0.19
+        tax_description = "Domestic German VAT 19%"
+        applicable_rule = "Domestic Standard VAT (fallback)"
 
     # Calculate tax amount
     tax_amount = subtotal * tax_rate

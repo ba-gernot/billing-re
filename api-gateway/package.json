@@ -4,9 +4,9 @@
   "description": "API Gateway for Billing RE System",
   "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
-    "test": "jest"
+    "dev": "bun --watch src/server.js",
+    "start": "bun src/server.js",
+    "test": "bun test"
   },
   "dependencies": {
     "fastify": "^4.24.3",
@@ -23,7 +23,12 @@
     "nodemon": "^3.0.2",
     "jest": "^29.7.0"
   },
-  "keywords": ["fastify", "api-gateway", "billing", "microservices"],
+  "keywords": [
+    "fastify",
+    "api-gateway",
+    "billing",
+    "microservices"
+  ],
   "author": "Billing RE Team",
   "license": "MIT"
 }

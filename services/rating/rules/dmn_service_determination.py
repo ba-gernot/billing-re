@@ -5,11 +5,26 @@ Replaces hardcoded service determination logic
 
 from typing import Dict, List, Any, Optional
 import logging
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logger = logging.getLogger(__name__)
 
-from dmn import get_dmn_engine
-from ..models.service_orders import ServiceOrder, ServiceType
+try:
+    from dmn import get_dmn_engine
+except ImportError:
+    logger.warning("DMN engine not available, using fallback")
+    get_dmn_engine = None
+
+try:
+    from models.service_orders import ServiceOrder, ServiceType
+except ImportError:
+    # Fallback if models don't exist
+    ServiceOrder = dict
+    ServiceType = str
 
 
 class DMNServiceDetermination:

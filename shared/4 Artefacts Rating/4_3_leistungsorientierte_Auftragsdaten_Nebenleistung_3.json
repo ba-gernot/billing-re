@@ -1,0 +1,52 @@
+{
+   "Order": {
+		"CommonData": {
+			"DateOfService": "2025-07-13 16:25:00",
+			"OrderReferences": {
+				"OrderReference": "ORD20250617-00042",
+				"ContainerPosition": "1"
+			},
+			"Freightpayer": {
+				"Code": "234567",
+				"GroupID": "30" // aus Stammdaten
+			},	
+			"Invoicing": {
+				"TypeOfOffer": ""
+			},
+			"Container": {
+				"TypeId": "22G1",
+				"Length": "20",
+				"GrossWeight": "23000",
+				"LoadingStatus": "beladen"
+			},
+			"TransportConditions": {
+				"TransportDirection": "Export",
+				"TypeOfTransport": "KV"
+			}				
+		},	
+		"MainServiceTransport": {
+			"ContainerContent": {
+				"DangerousGoodFlag": "J"
+			},
+			"RouteOfTransport": {
+				"Departure": {
+					"TariffPoint": "12345678",
+					"RailwayStationNumber": "80155283",
+					"RailwayStationCountryIsoCode": "DE"
+				},
+				"Destination": {
+					"TariffPoint": "",
+					"RailwayStationNumber": "80137943",
+					"RailwayStationCountryIsoCode": "DE"
+				}
+			},
+			"OverallTransport": {
+				"TakeOverCountryIsoCode": "DE",
+				"HandOverCountryIsoCode": "US"
+			}				
+		},
+		"AdditionalService": {
+			"Code": "456" // abgeleitet mit 4_Regeln_Leistungsermittlung.dmn
+		}
+	}
+}

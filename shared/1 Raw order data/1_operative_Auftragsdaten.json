@@ -1,0 +1,63 @@
+{
+   "Order": {
+      "OrderReference": "ORD20250617-00042",
+      "Customer": {
+         "Code": "123456",
+         "Name": "Kunde Test"
+      },
+      "Freightpayer": {
+         "Code": "234567",
+         "Name": "Frachzahler Test"
+      },
+      "Consignee": {
+         "Code": "345678",
+         "Name": "Empfänger Test"
+      },
+      "Container": {
+         "Position": "1",
+         "TransportDirection": "Export",
+         "ContainerTypeIsoCode": "22G1",
+         "TareWeight": "2000",
+         "Payload": "21000",
+         "RailService": {
+             "DepartureDate": "2025-07-13 16:25:00",
+             "DepartureTerminal": {
+                 "RailwayStationNumber": "80155283"
+             },
+             "DestinationTerminal": {
+                 "RailwayStationNumber": "80137943"
+             }
+         },
+         "TruckingServices": [
+             {
+                 "SequenceNumber": "1",
+                 "Type": "Lieferung",
+                 "TruckingCode": "LB",				 
+                 "Waypoints": [
+                     {
+                         "SequenceNumber": "1",
+                         "IsMainAdress": "N",
+                         "WayPointType": "Depot",
+                         "TariffPoint": "23456789",
+						 "AdressCode": "0123456789"
+                     },
+                     {
+                         "SequenceNumber": "2",
+                         "IsMainAdress": "J",
+                         "WayPointType": "Anfahrstelle",
+                         "TariffPoint": "12345678",
+						 "AdressCode": "9876543210",
+                         "DeliveryDate": "2025-07-15 10:00:00"
+                     }
+				]	 
+			 }		 
+         ],
+         "AdditionalServices": [
+             {
+                 "Code": "123"
+             }
+         ],
+         "DangerousGoodFlag": "J"
+     }
+  }
+}

@@ -1,0 +1,63 @@
+{
+   "Order": {
+		"CommonData": {
+			"DateOfService": "2025-07-13 16:25:00",
+			"OrderReferences": {
+				"OrderReference": "ORD20250617-00042",
+				"ContainerPosition": "1"
+			},
+			"Freightpayer": {
+				"Code": "234567",
+				"GroupID": "30"
+			},	
+			"Invoicing": {
+				"TypeOfOffer": ""
+			},
+			"Container": {
+				"TypeId": "22G1",
+				"Length": "20",
+				"GrossWeight": "23000",
+				"LoadingStatus": "beladen"
+			},
+			"TransportConditions": {
+				"TransportDirection": "Export",
+				"TypeOfTransport": "KV"
+			}				
+		},
+		"TruckingServices": [
+			{
+				"SequenceNumber": "1",
+				"Trip": {
+					"TripNumber": "1",
+					"TypeOfTrip": "Zustellung",
+					"Departure": { 
+						"RailwayStationNumber": "",
+						"RailwayStationCountryIsoCode": "",
+						"TariffPoint": "12345678",
+						"AddressCode": "9876543210"
+					},
+					"Destination": { 
+						"RailwayStationNumber": "80155283",
+						"RailwayStationCountryIsoCode": "DE",
+						"TariffPoint": "98765432",
+						"AddressCode": "9801234567"					
+					}
+				}	
+			}
+		],
+		"AdditionalService": {
+			"Code": "789",
+			"Name": "Wartezeit Export",
+			"_comment": "aus Preistabelle 6_Preistabelle_Nebenleistungen.xlsx",
+            "AmountBrutto": "8",
+            "AmountNetto": "5",
+            "Unit": "Einheit"
+		},
+		"Prices": {
+			"Amount": "250",
+			"_comment_amount": "Preis (aus 6_Preistabelle_Nebenleistungen.xlsx) * Nettomenge Einheiten",
+			"Currency": "EUR",
+			"_comment_currency": "Standard"
+		}
+    }
+}

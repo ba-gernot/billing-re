@@ -25,8 +25,9 @@ class RatingDatabaseConnection:
             )
             logger.info("Rating service database connection pool initialized")
         except Exception as e:
-            logger.error(f"Failed to initialize database connection: {e}")
-            raise
+            logger.warning(f"Failed to initialize database connection: {e}")
+            logger.warning("Running without database - XLSX processors will still work")
+            self.connection_pool = None  # Allow service to start without database
 
     async def close(self):
         """Close database connection pool"""

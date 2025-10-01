@@ -266,7 +266,8 @@ async function callTransformationService(orderData, logger, traceId) {
 }
 
 async function callRatingService(transformationResult, logger, traceId) {
-  const url = `${process.env.RATING_SERVICE_URL}/rate`;
+  // Use /rate-xlsx endpoint for XLSX-based rating (100% alignment with shared docs)
+  const url = `${process.env.RATING_SERVICE_URL}/rate-xlsx`;
 
   // Convert transformation result to rating service input format
   const serviceOrders = [
@@ -325,17 +326,34 @@ async function callRatingService(transformationResult, logger, traceId) {
 async function callBillingService(ratingResult, originalOrder, logger, traceId) {
   const url = `${process.env.BILLING_SERVICE_URL}/generate-invoice`;
 
+  // Extract route information for tax calculation
+  const container = originalOrder.Order.Container;
+  const railService = container.RailService || {};
+
   // Convert rating result to billing service input format
   const billingInput = {
     order_reference: ratingResult.order_reference,
     customer_code: originalOrder.Order.Customer.Code,
-    transport_direction: originalOrder.Order.Container.TransportDirection,
+    transport_direction: container.TransportDirection,
+    route_from: railService.DepartureTerminal?.RailwayStationNumber,
+    route_to: railService.DestinationTerminal?.RailwayStationNumber,
+    departure_date: railService.DepartureDate,
+    operational_order_id: originalOrder.Order.OrderReference,
+    // Tax calculation fields for XLSX processor
+    departure_country: 'DE',
+    destination_country: container.TransportDirection === 'Export' ? 'US' : 'DE',
+    vat_id: originalOrder.Order.Customer.VatId || null,
+    customs_procedure: originalOrder.Order.CustomsProcedure || null,
+    loading_status: container.LoadingStatus || 'beladen',
     line_items: ratingResult.services.map(service => ({
       service_code: service.service_code,
+      service_name: service.service_name,
       description: service.description,
       quantity: 1,
       unit_price: service.base_price,
-      total_price: service.calculated_amount
+      total_price: service.calculated_amount,
+      offer_code: service.offer_code,
+      price_source: service.price_source
     }))
   };
 
