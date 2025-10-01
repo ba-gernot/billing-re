@@ -56,9 +56,13 @@ async function routes(fastify) {
         200: {
           type: 'object',
           properties: {
-            invoice: { type: 'object' },
+            invoice: {
+              type: 'object',
+              additionalProperties: true  // Allow all invoice properties
+            },
             processing_time_ms: { type: 'number' },
-            warnings: { type: 'array' }
+            warnings: { type: 'array' },
+            request_id: { type: 'string' }
           }
         }
       }
