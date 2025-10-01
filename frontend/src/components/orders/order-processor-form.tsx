@@ -23,10 +23,29 @@ import { FileText, Upload } from 'lucide-react'
 
 interface ProcessingResult {
   invoice?: {
-    invoice_number: string
-    total: string | number
-    currency: string
+    invoice_id?: string
+    invoice_number?: string
+    customer_code?: string
+    customer_name?: string
+    invoice_date?: string
+    due_date?: string
+    subtotal?: number
+    tax_calculation?: {
+      tax_case: string
+      tax_rate: number
+      tax_amount: number
+      tax_description: string
+      applicable_rule?: string
+    }
+    total?: number
+    currency?: string
+    line_items?: Array<any>
+    document_aggregation?: any
     pdf_path?: string
+    xml_path?: string
+    status?: string
+    processing_details?: Record<string, any>
+    warnings?: string[]
   }
   orchestration?: {
     traceId: string
@@ -37,6 +56,7 @@ interface ProcessingResult {
     }>
   }
   warnings?: string[]
+  errors?: string[]
 }
 
 interface ApiError {
@@ -120,6 +140,9 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
       console.log('[OrderProcessor] Calling API to process order...')
       const response = await orderApi.processOrder(orderData)
       console.log('[OrderProcessor] API response:', response)
+      console.log('[OrderProcessor] Invoice object:', response?.invoice)
+      console.log('[OrderProcessor] Invoice total:', response?.invoice?.total)
+      console.log('[OrderProcessor] Invoice number:', response?.invoice?.invoice_number)
 
       setResult(response)
       toast.success('Order processed successfully!')
@@ -153,6 +176,9 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
       console.log('[OrderProcessor] Calling API to process order...')
       const response = await orderApi.processOrder(orderData)
       console.log('[OrderProcessor] API response:', response)
+      console.log('[OrderProcessor] Invoice object:', response?.invoice)
+      console.log('[OrderProcessor] Invoice total:', response?.invoice?.total)
+      console.log('[OrderProcessor] Invoice number:', response?.invoice?.invoice_number)
 
       setResult(response)
       toast.success('Order processed successfully!')
@@ -228,7 +254,7 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
               <CardHeader>
                 <CardTitle className="text-green-600">Order Processed Successfully!</CardTitle>
                 <CardDescription>
-                  Invoice generated with total: {result.invoice?.total ? `€${result.invoice.total}` : 'N/A'}
+                  Invoice generated with total: {result.invoice?.total !== undefined ? `€${result.invoice.total}` : 'N/A'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -237,9 +263,15 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
                     <div>
                       <h4 className="font-medium mb-2">Invoice Details:</h4>
                       <div className="bg-gray-50 p-3 rounded text-sm">
-                        <p><strong>Invoice Number:</strong> {result.invoice.invoice_number}</p>
-                        <p><strong>Total Amount:</strong> €{result.invoice.total}</p>
-                        <p><strong>Currency:</strong> {result.invoice.currency}</p>
+                        <p><strong>Invoice Number:</strong> {result.invoice.invoice_number || 'N/A'}</p>
+                        <p><strong>Total Amount:</strong> {result.invoice.total !== undefined ? `€${result.invoice.total}` : 'N/A'}</p>
+                        <p><strong>Currency:</strong> {result.invoice.currency || 'N/A'}</p>
+                        {result.invoice.subtotal !== undefined && (
+                          <p><strong>Subtotal:</strong> €{result.invoice.subtotal}</p>
+                        )}
+                        {result.invoice.tax_calculation && (
+                          <p><strong>Tax:</strong> €{result.invoice.tax_calculation.tax_amount} ({result.invoice.tax_calculation.tax_case})</p>
+                        )}
                         {result.invoice.pdf_path && (
                           <p><strong>PDF Generated:</strong> {result.invoice.pdf_path}</p>
                         )}

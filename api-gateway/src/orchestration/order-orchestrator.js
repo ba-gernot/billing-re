@@ -277,7 +277,10 @@ async function callRatingService(transformationResult, logger, traceId) {
       weight_class: calculateWeightClass(transformationResult.main_service),
       transport_type: transformationResult.main_service.transport_type,
       dangerous_goods_flag: transformationResult.main_service.dangerous_goods_flag,
-      departure_date: transformationResult.main_service.departure_date
+      departure_date: transformationResult.main_service.departure_date,
+      departure_station: transformationResult.main_service.departure_station,
+      destination_station: transformationResult.main_service.destination_station,
+      loading_status: transformationResult.main_service.loading_status
     },
     ...transformationResult.trucking_services.map(service => ({
       service_type: service.service_type,
@@ -285,7 +288,10 @@ async function callRatingService(transformationResult, logger, traceId) {
       weight_class: calculateWeightClass(service),
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,
-      departure_date: service.departure_date
+      departure_date: service.departure_date,
+      departure_station: service.departure_station,
+      destination_station: service.destination_station,
+      loading_status: service.loading_status
     })),
     ...transformationResult.additional_services.map(service => ({
       service_type: service.service_type,
@@ -293,7 +299,12 @@ async function callRatingService(transformationResult, logger, traceId) {
       weight_class: calculateWeightClass(service),
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,
-      departure_date: service.departure_date
+      departure_date: service.departure_date,
+      departure_station: service.departure_station,
+      destination_station: service.destination_station,
+      loading_status: service.loading_status,
+      additional_service_code: service.additional_service_code,
+      quantity: service.quantity
     }))
   ];
 

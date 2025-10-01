@@ -470,15 +470,17 @@ class XLSXDMNProcessor:
             ]
         """
 
-        # Try to load from shared folder first
-        shared_path = self.rules_dir.parent.parent.parent / "shared" / "2 Rules" / "4_Regeln_Leistungsermittlung.xlsx"
+        # Load service determination rules from configured rules directory
+        # The rules_dir should point to dmn-rules symlink which points to shared/2 Rules/
+        rules_path = self.rules_dir / "4_Regeln_Leistungsermittlung.xlsx"
 
-        if not shared_path.exists():
-            logger.warning(f"Service determination rules not found at {shared_path}")
+        if not rules_path.exists():
+            logger.warning(f"Service determination rules not found at {rules_path}")
+            logger.debug(f"Rules directory: {self.rules_dir}, exists: {self.rules_dir.exists()}")
             return []
 
         try:
-            wb = openpyxl.load_workbook(shared_path)
+            wb = openpyxl.load_workbook(rules_path)
             ws = wb.active
 
             # Parse the XLSX structure

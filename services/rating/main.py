@@ -626,9 +626,17 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
         rules_applied = []
 
         for service_order in service_orders:
+            # Map service type from English to German (XLSX format)
+            service_type_mapping = {
+                'MAIN': 'Hauptleistung Transport',
+                'TRUCKING': 'Nebenleistung Trucking',
+                'ADDITIONAL': 'Nebenleistung'
+            }
+            xlsx_service_type = service_type_mapping.get(service_order.service_type, service_order.service_type)
+
             # Build order context for XLSX processor
             order_context = {
-                'service_type': service_order.service_type,
+                'service_type': xlsx_service_type,
                 'loading_status': service_order.loading_status or 'beladen',
                 'transport_type': service_order.transport_type,
                 'dangerous_goods': service_order.dangerous_goods_flag,
@@ -637,16 +645,32 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
                 'service_date': service_order.departure_date.replace('-', '').replace(':', '').replace(' ', '')[:8] if service_order.departure_date else ''
             }
 
-            # Step 1: Service determination using XLSX (COLLECT policy)
-            determined_services = xlsx_dmn_processor.evaluate_service_determination_full(order_context)
+            # Step 1: Service determination using XLSX (COLLECT policy) for MAIN services
+            # For TRUCKING and ADDITIONAL, use direct mapping as they're not in XLSX rules
+            determined_services = []
+
+            if service_order.service_type == 'MAIN':
+                determined_services = xlsx_dmn_processor.evaluate_service_determination_full(order_context)
+                if determined_services:
+                    rules_applied.append(f"XLSX Service Determination: {len(determined_services)} services")
+
+            elif service_order.service_type == 'TRUCKING':
+                # Trucking services are determined directly from transformation
+                determined_services.append({'code': 123, 'name': 'Zustellung Export'})
+                rules_applied.append("Added service 123 (Trucking → Zustellung)")
+
+            elif service_order.service_type == 'ADDITIONAL':
+                # Additional services come with their service code from transformation
+                if service_order.additional_service_code:
+                    service_code_int = int(service_order.additional_service_code) if isinstance(service_order.additional_service_code, str) else service_order.additional_service_code
+                    determined_services.append({
+                        'code': service_code_int,
+                        'name': f'Additional Service {service_code_int}',
+                        'quantity_netto': service_order.quantity or 1
+                    })
+                    rules_applied.append(f"Added additional service {service_code_int}")
 
             if determined_services:
-                rules_applied.append(f"XLSX Service Determination: {len(determined_services)} services")
-
-                # Add service 123 if this is a trucking service
-                if service_order.service_type == "TRUCKING" or service_order.additional_service_code == "123":
-                    determined_services.append({'code': 123, 'name': 'Zustellung Export'})
-                    rules_applied.append("Added service 123 (Zustellung)")
 
                 # Auto-determine service 789 from service 123
                 determined_services = xlsx_dmn_processor.determine_service_789_from_123(determined_services)
@@ -723,7 +747,34 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
                             services.append(pricing)
                             total_amount += price_result['total_price']
                         else:
-                            warnings.append(f"Additional service price not found for {service_code}")
+                            # Fallback to hardcoded prices for missing services
+                            hardcoded_additional_prices = {
+                                '111': 100.0,
+                                '222': 18.0,
+                                '333': 25.0,
+                                '444': 85.0,
+                                '456': 15.0,
+                                '555': 35.0,
+                                '789': 250.0,
+                                '123': 50.0
+                            }
+
+                            if service_code in hardcoded_additional_prices:
+                                fallback_price = hardcoded_additional_prices[service_code]
+                                pricing = PricingResult(
+                                    service_code=service_code,
+                                    service_name=service['name'],
+                                    description=f"{service['name']} (Fallback: hardcoded)",
+                                    base_price=fallback_price,
+                                    calculated_amount=fallback_price * quantity,
+                                    currency="EUR",
+                                    price_source="hardcoded_fallback"
+                                )
+                                services.append(pricing)
+                                total_amount += fallback_price * quantity
+                                warnings.append(f"Using hardcoded fallback price for service {service_code}")
+                            else:
+                                warnings.append(f"Additional service price not found for {service_code}")
 
             else:
                 warnings.append(f"No services determined for {service_order.service_type}")

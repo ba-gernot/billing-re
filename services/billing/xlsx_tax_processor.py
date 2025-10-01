@@ -100,7 +100,8 @@ class XLSXTaxProcessor:
             transport_direction = order_context.get('transport_direction', '').lower()
             customs_procedure = order_context.get('customs_procedure', '').upper()
 
-            logger.debug(f"Evaluating tax rules for order: {order_context}")
+            logger.info(f"Evaluating tax rules for order: {order_context}")
+            logger.info(f"Tax XLSX file: {self.tax_calculation_file}, exists: {self.tax_calculation_file.exists()}")
 
             # Iterate through rules (starting from row 3, row 2 is header)
             for row_idx in range(3, ws.max_row + 1):
@@ -143,8 +144,13 @@ class XLSXTaxProcessor:
                     matches.append(True)
 
                 # Destination location match
+                # SPECIAL CASE: For Export with "Inland" destination in XLSX, treat as wildcard
+                # because XLSX data structure doesn't match physical transport direction
                 if rule_destination:
-                    matches.append(rule_destination.lower() in destination_location)
+                    if rule_direction and 'export' in rule_direction.lower() and 'inland' in rule_destination.lower():
+                        matches.append(True)  # Treat as wildcard for Export
+                    else:
+                        matches.append(rule_destination.lower() in destination_location)
                 else:
                     matches.append(True)
 
@@ -164,7 +170,11 @@ class XLSXTaxProcessor:
                     if 'relevant' in rule_vat_country.lower():
                         matches.append(True)  # "nicht relevant" = wildcard
                     else:
-                        matches.append(rule_vat_country.upper() == vat_country.upper())
+                        # If VAT ID is "keine", treat vat_country as wildcard for Export
+                        if vat_id and 'keine' in vat_id.lower() and rule_direction and 'export' in rule_direction.lower():
+                            matches.append(True)  # No VAT ID for Export = match any country
+                        else:
+                            matches.append(rule_vat_country.upper() == vat_country.upper())
                 else:
                     matches.append(True)
 
@@ -176,11 +186,18 @@ class XLSXTaxProcessor:
 
                 # Customs procedure match
                 if rule_customs:
-                    # Handle comma-separated list
-                    customs_list = [c.strip().upper() for c in rule_customs.split(',')]
-                    matches.append(any(c in customs_procedure.upper() for c in customs_list))
+                    # If order has no customs procedure, treat as wildcard match for Export
+                    if not customs_procedure and rule_direction and 'export' in rule_direction.lower():
+                        matches.append(True)  # No customs procedure provided = match any Export rule
+                    else:
+                        # Handle comma-separated list
+                        customs_list = [c.strip().upper() for c in rule_customs.split(',')]
+                        matches.append(any(c in customs_procedure.upper() for c in customs_list))
                 else:
                     matches.append(True)
+
+                # Log matching progress for debugging
+                logger.debug(f"Row {row_idx} matching: {matches} - Service:{rule_service}, Loading:{rule_loading}, Dep:{rule_departure}, Dest:{rule_destination}, VAT-ID:{rule_vat_id}, Direction:{rule_direction}, Customs:{rule_customs}")
 
                 # If all conditions match, extract actions
                 if all(matches):
@@ -264,7 +281,7 @@ class XLSXTaxProcessor:
             'departure_location_type': departure_location,
             'destination_location_type': destination_location,
             'vat_id': vat_id or 'keine',
-            'vat_country': destination_country.upper() if vat_id else 'nicht relevant',
+            'vat_country': destination_country.upper(),  # Always use destination country
             'transport_direction': transport_direction,
             'customs_procedure': customs_procedure or ''
         }

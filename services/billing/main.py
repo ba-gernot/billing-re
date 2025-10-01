@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 import time
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 
 from database.connection import billing_db
 from generation.pdf_generator import InvoicePDFGenerator
@@ -14,8 +15,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Initialize XLSX tax processor
-tax_processor = XLSXTaxProcessor()
+# Initialize XLSX tax processor with symlink path to shared rules
+current_dir = Path(__file__).parent
+rules_dir = current_dir / "shared" / "2 Rules"
+tax_processor = XLSXTaxProcessor(rules_dir=rules_dir)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -82,7 +85,7 @@ class TaxCalculationResult(BaseModel):
 
 class DocumentAggregationResult(BaseModel):
     grouped_items: List[BillingLineItem]
-    consolidation_summary: Dict[str, int]
+    consolidation_summary: Dict[str, Any]  # Allow int and float for consolidation_ratio
     total_services: int
 
 

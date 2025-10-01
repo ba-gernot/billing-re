@@ -38,6 +38,10 @@ class BillingDatabaseConnection:
     async def get_tax_rules(self, transport_direction: str, from_country: str = "DE",
                            to_country: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get applicable tax rules based on transport direction and countries"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - tax rules lookup skipped")
+            return None
+
         query = """
         SELECT id, rule_name, conditions, tax_case, tax_rate, description,
                valid_from, valid_to
@@ -99,6 +103,10 @@ class BillingDatabaseConnection:
 
     async def insert_billing_documents(self, billing_data: List[Dict[str, Any]]) -> List[str]:
         """Insert billing documents and return IDs"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - billing documents insertion skipped")
+            return []
+
         query = """
         INSERT INTO billing_documents (
             service_order_id, offer_id, base_price, calculated_amount, currency,
@@ -129,6 +137,13 @@ class BillingDatabaseConnection:
 
     async def generate_invoice_number(self) -> str:
         """Generate sequential invoice number"""
+        if self.connection_pool is None:
+            # Fallback: timestamp-based invoice number
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            logger.warning(f"Database not available - using timestamp-based invoice number: INV-{timestamp}")
+            return f"INV-{timestamp}"
+
         query = """
         SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 'INV-(.*)') AS INTEGER)), 0) + 1 as next_number
         FROM invoice_documents
@@ -142,6 +157,10 @@ class BillingDatabaseConnection:
 
     async def insert_invoice_document(self, invoice_data: Dict[str, Any]) -> str:
         """Insert invoice document and return ID"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - invoice document insertion skipped")
+            return "temp-invoice-id"
+
         query = """
         INSERT INTO invoice_documents (
             invoice_number, operational_order_id, customer_id, subtotal,
@@ -172,6 +191,10 @@ class BillingDatabaseConnection:
 
     async def get_customer_by_code(self, customer_code: str) -> Optional[Dict[str, Any]]:
         """Get customer information by code"""
+        if self.connection_pool is None:
+            logger.warning(f"Database not available - customer lookup skipped for {customer_code}")
+            return None
+
         query = """
         SELECT id, code, name, customer_group, vat_id, country_code
         FROM customers
@@ -186,6 +209,10 @@ class BillingDatabaseConnection:
 
     async def get_country_info(self, country_code: str) -> Optional[Dict[str, Any]]:
         """Get country information including VAT rates"""
+        if self.connection_pool is None:
+            logger.warning(f"Database not available - country lookup skipped for {country_code}")
+            return None
+
         query = """
         SELECT code, name, eu_member, default_vat_rate, currency
         FROM countries

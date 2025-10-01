@@ -37,6 +37,10 @@ class RatingDatabaseConnection:
 
     async def get_active_service_rules(self, rule_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all active service rules, optionally filtered by type"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - returning empty service rules")
+            return []
+
         query = """
         SELECT id, rule_name, rule_type, conditions, service_code, description,
                priority, valid_from, valid_to, dmn_file_path
@@ -60,6 +64,10 @@ class RatingDatabaseConnection:
     async def get_customer_pricing(self, customer_id: str, weight_class: str,
                                    transport_direction: str) -> Optional[Dict[str, Any]]:
         """Get customer-specific pricing with offer-based lookup"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - customer pricing lookup skipped")
+            return None
+
         query = """
         SELECT id, customer_id, offer_code, weight_class, transport_direction,
                route_from, route_to, price, minimum_price, currency, unit,
@@ -83,6 +91,10 @@ class RatingDatabaseConnection:
 
     async def get_fallback_pricing(self, weight_class: str, transport_direction: str) -> Optional[Dict[str, Any]]:
         """Get fallback pricing when customer-specific pricing is not available"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - fallback pricing lookup skipped")
+            return None
+
         query = """
         SELECT id, offer_code, weight_class, transport_direction,
                price, minimum_price, currency, unit
@@ -105,6 +117,10 @@ class RatingDatabaseConnection:
 
     async def get_additional_service_pricing(self, service_code: str) -> Optional[Dict[str, Any]]:
         """Get pricing for additional services"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - additional service pricing lookup skipped")
+            return None
+
         query = """
         SELECT id, service_code, service_name, price_type, price, currency,
                valid_from, valid_to
@@ -125,6 +141,10 @@ class RatingDatabaseConnection:
 
     async def get_customer_by_code(self, customer_code: str) -> Optional[Dict[str, Any]]:
         """Get customer information by code"""
+        if self.connection_pool is None:
+            logger.warning(f"Database not available - customer lookup skipped for {customer_code}")
+            return None
+
         query = """
         SELECT id, code, name, customer_group, vat_id, country_code
         FROM customers
@@ -139,6 +159,10 @@ class RatingDatabaseConnection:
 
     async def apply_service_determination_rules(self, service_context: Dict[str, Any]) -> List[str]:
         """Apply service determination rules based on context"""
+        if self.connection_pool is None:
+            logger.warning("Database not available - returning empty service determination rules")
+            return []
+
         # This implements the 8 service determination rules from the roadmap
 
         rules_query = """
