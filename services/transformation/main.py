@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import time
+import json
 from typing import List
 from contextlib import asynccontextmanager
 
@@ -42,6 +43,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Debug middleware to log raw requests
+@app.middleware("http")
+async def log_raw_request(request: Request, call_next):
+    if request.url.path == "/transform":
+        # Read the raw body
+        body = await request.body()
+        print(f"\n{'='*80}")
+        print(f"[RAW REQUEST MIDDLEWARE] Path: {request.url.path}")
+        print(f"[RAW REQUEST MIDDLEWARE] Method: {request.method}")
+        print(f"[RAW REQUEST MIDDLEWARE] Headers: {dict(request.headers)}")
+        print(f"[RAW REQUEST MIDDLEWARE] Raw Body Length: {len(body)} bytes")
+
+        try:
+            body_json = json.loads(body)
+            print(f"[RAW REQUEST MIDDLEWARE] Parsed JSON Keys: {list(body_json.keys())}")
+            if 'Order' in body_json:
+                order_keys = list(body_json['Order'].keys())
+                print(f"[RAW REQUEST MIDDLEWARE] Order Keys: {order_keys}")
+                print(f"[RAW REQUEST MIDDLEWARE] Has Consignee in Order: {'Consignee' in order_keys}")
+                if 'Container' in body_json['Order']:
+                    container_keys = list(body_json['Order']['Container'].keys())
+                    print(f"[RAW REQUEST MIDDLEWARE] Container Keys: {container_keys}")
+                    print(f"[RAW REQUEST MIDDLEWARE] Has Position in Container: {'Position' in container_keys}")
+            print(f"[RAW REQUEST MIDDLEWARE] Full Body Preview:")
+            print(json.dumps(body_json, indent=2)[:500])  # First 500 chars
+        except Exception as e:
+            print(f"[RAW REQUEST MIDDLEWARE] Could not parse JSON: {e}")
+        print(f"{'='*80}\n")
+
+        # Important: Re-create the request with the body we just read
+        async def receive():
+            return {"type": "http.request", "body": body}
+
+        request = Request(request.scope, receive)
+
+    response = await call_next(request)
+    return response
+
 # Initialize services
 order_validator = OrderValidator()
 container_enricher = ContainerEnricher()
@@ -65,6 +104,28 @@ async def transform_order(order_input: OperationalOrderInput):
     4. Apply business rules for field mapping
     """
     start_time = time.time()
+
+    # DEBUG LOGGING: Log the raw input received by Pydantic
+    print(f"\n{'='*80}")
+    print(f"[TRANSFORMATION SERVICE] Received order_input type: {type(order_input)}")
+    print(f"[TRANSFORMATION SERVICE] order_input.order type: {type(order_input.order)}")
+    print(f"[TRANSFORMATION SERVICE] Has customer: {hasattr(order_input.order, 'customer')}")
+    print(f"[TRANSFORMATION SERVICE] Has freightpayer: {hasattr(order_input.order, 'freightpayer')}")
+    print(f"[TRANSFORMATION SERVICE] Has consignee: {hasattr(order_input.order, 'consignee')}")
+    print(f"[TRANSFORMATION SERVICE] Has container: {hasattr(order_input.order, 'container')}")
+
+    if hasattr(order_input.order, 'consignee'):
+        print(f"[TRANSFORMATION SERVICE] Consignee: {order_input.order.consignee}")
+    else:
+        print(f"[TRANSFORMATION SERVICE] ❌ CONSIGNEE IS MISSING!")
+
+    if hasattr(order_input.order, 'container'):
+        print(f"[TRANSFORMATION SERVICE] Container has position: {hasattr(order_input.order.container, 'position')}")
+        if hasattr(order_input.order.container, 'position'):
+            print(f"[TRANSFORMATION SERVICE] Container position: {order_input.order.container.position}")
+        else:
+            print(f"[TRANSFORMATION SERVICE] ❌ CONTAINER POSITION IS MISSING!")
+    print(f"{'='*80}\n")
 
     try:
         # Step 1: Validate order
@@ -104,6 +165,15 @@ async def transform_order(order_input: OperationalOrderInput):
         )
 
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"\n{'='*80}")
+        print(f"[ERROR] Transformation failed with exception:")
+        print(f"[ERROR] Type: {type(e).__name__}")
+        print(f"[ERROR] Message: {str(e)}")
+        print(f"[ERROR] Full traceback:")
+        print(error_details)
+        print(f"{'='*80}\n")
         raise HTTPException(status_code=500, detail=f"Transformation failed: {str(e)}")
 
 
@@ -133,39 +203,43 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
         **base_fields
     )
 
-    # Store in database for persistence
-    try:
-        operational_order_id = await db.insert_operational_order({
-            "order_reference": order_input.order.order_reference,
-            "customer_id": validation_data.get("customer", {}).get("id"),
-            "freightpayer_id": validation_data.get("freightpayer", {}).get("id"),
-            "departure_date": order_input.order.container.rail_service.departure_date,
-            "transport_direction": order_input.order.container.transport_direction,
-            "container_data": enriched_container,
-            "route_data": {
-                "departure_station": base_fields["departure_station"],
-                "destination_station": base_fields["destination_station"]
-            },
-            "trucking_data": [t.dict() for t in order_input.order.container.trucking_services],
-            "dangerous_goods_flag": enriched_container["dangerous_goods"]
-        })
+    # Store in database for persistence (skip if database not available)
+    operational_order_id = None
+    if db.connection_pool is not None:
+        try:
+            operational_order_id = await db.insert_operational_order({
+                "order_reference": order_input.order.order_reference,
+                "customer_id": validation_data.get("customer", {}).get("id"),
+                "freightpayer_id": validation_data.get("freightpayer", {}).get("id"),
+                "departure_date": order_input.order.container.rail_service.departure_date,
+                "transport_direction": order_input.order.container.transport_direction,
+                "container_data": enriched_container,
+                "route_data": {
+                    "departure_station": base_fields["departure_station"],
+                    "destination_station": base_fields["destination_station"]
+                },
+                "trucking_data": [t.dict() for t in order_input.order.container.trucking_services],
+                "dangerous_goods_flag": enriched_container["dangerous_goods"]
+            })
 
-        main_service_db_data = {
-            "operational_order_id": operational_order_id,
-            "service_type": "MAIN",
-            "weight_class": enriched_container["weight_category"],
-            "route_from": base_fields["departure_station"],
-            "route_to": base_fields["destination_station"],
-            "loading_status": base_fields["loading_status"].value,
-            "transport_type": base_fields["transport_type"].value,
-            "service_data": main_service.dict()
-        }
+            main_service_db_data = {
+                "operational_order_id": operational_order_id,
+                "service_type": "MAIN",
+                "weight_class": enriched_container["weight_category"],
+                "route_from": base_fields["departure_station"],
+                "route_to": base_fields["destination_station"],
+                "loading_status": base_fields["loading_status"].value,
+                "transport_type": base_fields["transport_type"].value,
+                "service_data": main_service.dict()
+            }
 
-        service_ids = await db.insert_service_orders([main_service_db_data])
+            service_ids = await db.insert_service_orders([main_service_db_data])
 
-    except Exception as e:
-        # Log error but continue processing
-        print(f"Database insertion failed: {e}")
+        except Exception as e:
+            # Log error but continue processing
+            print(f"Database insertion failed: {e}")
+    else:
+        print("Database not available - skipping database persistence")
 
     # 2. TRUCKING SERVICES - Based on trucking data
     trucking_services = []
@@ -178,22 +252,23 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
         )
         trucking_services.append(trucking_service)
 
-        # Store trucking service in database
-        try:
-            trucking_db_data = {
-                "operational_order_id": operational_order_id,
-                "service_type": "TRUCKING",
-                "description": f"Trucking service {trucking.type}",
-                "weight_class": enriched_container["weight_category"],
-                "route_from": base_fields["departure_station"],
-                "route_to": base_fields["destination_station"],
-                "loading_status": base_fields["loading_status"].value,
-                "transport_type": base_fields["transport_type"].value,
-                "service_data": trucking_service.dict()
-            }
-            await db.insert_service_orders([trucking_db_data])
-        except Exception as e:
-            print(f"Trucking service DB insertion failed: {e}")
+        # Store trucking service in database (skip if database not available)
+        if db.connection_pool is not None and operational_order_id:
+            try:
+                trucking_db_data = {
+                    "operational_order_id": operational_order_id,
+                    "service_type": "TRUCKING",
+                    "description": f"Trucking service {trucking.type}",
+                    "weight_class": enriched_container["weight_category"],
+                    "route_from": base_fields["departure_station"],
+                    "route_to": base_fields["destination_station"],
+                    "loading_status": base_fields["loading_status"].value,
+                    "transport_type": base_fields["transport_type"].value,
+                    "service_data": trucking_service.dict()
+                }
+                await db.insert_service_orders([trucking_db_data])
+            except Exception as e:
+                print(f"Trucking service DB insertion failed: {e}")
 
     # 3. ADDITIONAL SERVICES - Based on additional services data
     additional_services = []
@@ -209,20 +284,21 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
         )
         additional_services.append(additional_service)
 
-        # Store additional service in database
-        try:
-            additional_db_data = {
-                "operational_order_id": operational_order_id,
-                "service_type": "ADDITIONAL",
-                "service_code": additional.code,
-                "description": f"Additional service {additional.code}",
-                "quantity": quantity,
-                "weight_class": enriched_container["weight_category"],
-                "service_data": additional_service.dict()
-            }
-            await db.insert_service_orders([additional_db_data])
-        except Exception as e:
-            print(f"Additional service DB insertion failed: {e}")
+        # Store additional service in database (skip if database not available)
+        if db.connection_pool is not None and operational_order_id:
+            try:
+                additional_db_data = {
+                    "operational_order_id": operational_order_id,
+                    "service_type": "ADDITIONAL",
+                    "service_code": additional.code,
+                    "description": f"Additional service {additional.code}",
+                    "quantity": quantity,
+                    "weight_class": enriched_container["weight_category"],
+                    "service_data": additional_service.dict()
+                }
+                await db.insert_service_orders([additional_db_data])
+            except Exception as e:
+                print(f"Additional service DB insertion failed: {e}")
 
     return {
         "main": main_service,

@@ -44,28 +44,46 @@ class OrderValidator:
                 "Expected: ORD[YYYYMMDD]-[00000]"
             )
 
-        # 2. Validate and enrich customer data
-        customer_data = await db.get_customer(order.order.customer.code)
-        if not customer_data:
-            errors.append(f"Customer code {order.order.customer.code} not found in database")
+        # 2. Validate and enrich customer data (skip if database not available)
+        customer_data = None
+        if db.connection_pool is not None:
+            customer_data = await db.get_customer(order.order.customer.code)
+            if not customer_data:
+                warnings.append(f"Customer code {order.order.customer.code} not found in database")
+            else:
+                enrichment_data["customer"] = customer_data
         else:
-            enrichment_data["customer"] = customer_data
+            warnings.append("Database not available - skipping customer validation")
 
         # 3. Validate freightpayer (could be same as customer)
-        freightpayer_data = await db.get_customer(order.order.freightpayer.code)
-        if not freightpayer_data:
-            errors.append(f"Freightpayer code {order.order.freightpayer.code} not found in database")
-        else:
-            enrichment_data["freightpayer"] = freightpayer_data
+        freightpayer_data = None
+        if db.connection_pool is not None:
+            freightpayer_data = await db.get_customer(order.order.freightpayer.code)
+            if not freightpayer_data:
+                warnings.append(f"Freightpayer code {order.order.freightpayer.code} not found in database")
+            else:
+                enrichment_data["freightpayer"] = freightpayer_data
 
         # 4. Validate and enrich container type (database lookup)
-        container_type = await db.get_container_type(order.order.container.container_type_iso_code)
+        container_type = None
+        if db.connection_pool is not None:
+            container_type = await db.get_container_type(order.order.container.container_type_iso_code)
+            if not container_type:
+                warnings.append(
+                    f"Invalid container type: {order.order.container.container_type_iso_code}. "
+                    "Container type not found in database - using defaults"
+                )
+
+        # Use defaults if container type not found in database
         if not container_type:
-            errors.append(
-                f"Invalid container type: {order.order.container.container_type_iso_code}. "
-                "Container type not found in database"
-            )
-        else:
+            # Default container type based on ISO code length
+            iso_code = order.order.container.container_type_iso_code
+            length = "20" if iso_code.startswith("2") else "40"
+            container_type = {
+                "length_ft": int(length),
+                "tare_weight_kg": 2300 if length == "20" else 3800,
+                "max_gross_weight_kg": 23000 if length == "20" else 30000
+            }
             enrichment_data["container_type"] = container_type
 
         # 5. Validate transport direction

@@ -1,34 +1,46 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
 class Customer(BaseModel):
-    code: str = Field(..., description="Customer code")
-    name: Optional[str] = Field(None, description="Customer name")
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str = Field(..., alias="Code", description="Customer code")
+    name: Optional[str] = Field(None, alias="Name", description="Customer name")
 
 
 class Freightpayer(BaseModel):
-    code: str = Field(..., description="Freightpayer code")
-    name: Optional[str] = Field(None, description="Freightpayer name")
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str = Field(..., alias="Code", description="Freightpayer code")
+    name: Optional[str] = Field(None, alias="Name", description="Freightpayer name")
 
 
 class Consignee(BaseModel):
-    code: str = Field(..., description="Consignee code")
-    name: Optional[str] = Field(None, description="Consignee name")
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str = Field(..., alias="Code", description="Consignee code")
+    name: Optional[str] = Field(None, alias="Name", description="Consignee name")
 
 
 class Terminal(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     railway_station_number: str = Field(..., alias="RailwayStationNumber")
 
 
 class RailService(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     departure_date: datetime = Field(..., alias="DepartureDate")
     departure_terminal: Terminal = Field(..., alias="DepartureTerminal")
     destination_terminal: Terminal = Field(..., alias="DestinationTerminal")
 
 
 class Waypoint(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     sequence_number: str = Field(..., alias="SequenceNumber")
     is_main_address: str = Field(..., alias="IsMainAdress")
     waypoint_type: str = Field(..., alias="WayPointType")
@@ -38,6 +50,8 @@ class Waypoint(BaseModel):
 
 
 class TruckingService(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     sequence_number: str = Field(..., alias="SequenceNumber")
     type: str = Field(..., alias="Type")
     trucking_code: str = Field(..., alias="TruckingCode")
@@ -45,10 +59,14 @@ class TruckingService(BaseModel):
 
 
 class AdditionalService(BaseModel):
-    code: str = Field(..., description="Additional service code")
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str = Field(..., alias="Code", description="Additional service code")
 
 
 class Container(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     position: str = Field(..., alias="Position")
     transport_direction: str = Field(..., alias="TransportDirection")
     container_type_iso_code: str = Field(..., alias="ContainerTypeIsoCode")
@@ -61,6 +79,8 @@ class Container(BaseModel):
 
 
 class Order(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     order_reference: str = Field(..., alias="OrderReference")
     customer: Customer = Field(..., alias="Customer")
     freightpayer: Freightpayer = Field(..., alias="Freightpayer")
@@ -69,7 +89,6 @@ class Order(BaseModel):
 
 
 class OperationalOrderInput(BaseModel):
-    order: Order = Field(..., alias="Order")
+    model_config = ConfigDict(populate_by_name=True)
 
-    class Config:
-        populate_by_name = True
+    order: Order = Field(..., alias="Order")

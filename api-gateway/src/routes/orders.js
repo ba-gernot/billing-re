@@ -13,7 +13,12 @@ const orderSchema = z.object({
       Code: z.string(),
       Name: z.string().optional()
     }),
+    Consignee: z.object({
+      Code: z.string(),
+      Name: z.string().optional()
+    }),
     Container: z.object({
+      Position: z.string(),
       ContainerTypeIsoCode: z.string(),
       TareWeight: z.string(),
       Payload: z.string(),
