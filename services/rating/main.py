@@ -14,6 +14,11 @@ from dmn import get_dmn_engine
 from xlsx_dmn_processor import XLSXDMNProcessor
 from xlsx_price_loader import XLSXPriceLoader
 
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='[RATING] %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -69,6 +74,7 @@ app.add_middleware(
 class ServiceOrderInput(BaseModel):
     service_type: str
     customer_code: str
+    freightpayer_code: Optional[str] = None  # Who pays for the service
     weight_class: Optional[str] = None  # Will be calculated if not provided
     transport_type: str
     dangerous_goods_flag: bool
@@ -616,6 +622,12 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
     start_time = time.time()
     warnings = []
 
+    # DEBUG: Check what Pydantic received
+    if service_orders:
+        logger.info(f"🔍 DEBUG RAW INPUT: service_orders[0] = {service_orders[0].dict()}")
+        logger.info(f"🔍 DEBUG: customer_code = {service_orders[0].customer_code}")
+        logger.info(f"🔍 DEBUG: freightpayer_code = {service_orders[0].freightpayer_code}")
+
     try:
         # Get customer information
         customer_data = None
@@ -625,7 +637,7 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
             customer_data = await rating_db.get_customer_by_code(customer_code)
             if not customer_data:
                 warnings.append(f"Customer {customer_code} not found in database, using code only")
-                customer_data = {'customer_group': '30'}  # Default group
+                customer_data = {}  # No fallback - will match generic XLSX rows
 
         services = []
         total_amount = 0.0
@@ -679,11 +691,64 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
             determined_services = []
 
             if service_order.service_type == 'MAIN':
+                logger.info("="*80)
+                logger.info("🚚 [STEP 5] MAIN TRANSPORT SERVICE PRICING")
+                logger.info("="*80)
+                # STEP 5: First, price the MAIN transport service (€150 in test scenario)
+                # This is the base transport price based on weight class, direction, stations, etc.
+                # XLSX column mapping:
+                # - Angebotsnummer (col 0) = Order.Customer.Code
+                # - Kundengruppe (col 1) = empty (not in JSON)
+                # - Kundennummer (col 2) = Order.Freightpayer.Code
+                freightpayer_code = service_order.freightpayer_code or ''
+                logger.info(f"DEBUG: Angebotsnummer={customer_code}, Kundennummer={freightpayer_code}")
+                main_transport_price = xlsx_price_loader.get_main_service_price_advanced(
+                    customer_code=freightpayer_code,  # Kundennummer column
+                    customer_group='',  # Kundengruppe column (empty - not in JSON)
+                    offer_number=customer_code or '',  # Angebotsnummer column
+                    departure_country='DE',
+                    departure_station=service_order.departure_station or '',
+                    tariff_point_dep='',
+                    destination_country='DE',
+                    destination_station=service_order.destination_station or '',
+                    tariff_point_dest='',
+                    direction='Export',
+                    loading_status=service_order.loading_status or 'beladen',
+                    transport_form=service_order.transport_type,
+                    container_length=container_length or '20',
+                    weight_class=service_order.weight_class,
+                    service_date=service_order.departure_date or ''
+                )
+
+                if main_transport_price:
+                    pricing = PricingResult(
+                        service_code='MAIN',
+                        service_name='Main Transport Service',
+                        description=f"Main Transport Service (XLSX: specificity {main_transport_price['specificity']})",
+                        base_price=main_transport_price['price'],
+                        calculated_amount=main_transport_price['price'],
+                        currency="EUR",
+                        price_source="xlsx_main"
+                    )
+                    services.append(pricing)
+                    total_amount += main_transport_price['price']
+                    all_applicable_services.append('MAIN')
+                    rules_applied.append(f"[STEP 5] Main Transport Service: €{main_transport_price['price']} (specificity: {main_transport_price['specificity']})")
+                    logger.info(f"[STEP 5] Main Transport Service: €{main_transport_price['price']} (specificity: {main_transport_price['specificity']})")
+                else:
+                    warnings.append("Main transport service price not found")
+                    logger.warning("Main transport service price not found")
+
+                # STEP 4: Then, determine additional services (111, 222, 444, 456, etc.)
+                logger.info("")
+                logger.info("="*80)
+                logger.info("📋 [STEP 4] SERVICE DETERMINATION (COLLECT POLICY)")
+                logger.info("="*80)
                 determined_services = xlsx_dmn_processor.evaluate_service_determination_full(order_context)
                 if determined_services:
                     service_codes = [s['code'] for s in determined_services]
                     rules_applied.append(f"[STEP 4] Service Determination (COLLECT): {service_codes}")
-                    logger.info(f"[STEP 4] Service Determination: {len(determined_services)} services matched → {service_codes}")
+                    logger.info(f"✅ [STEP 4] Service Determination: {len(determined_services)} services matched → {service_codes}")
 
             elif service_order.service_type == 'TRUCKING':
                 # Trucking services are determined directly from transformation
@@ -703,99 +768,62 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
                     rules_applied.append(f"Added additional service {service_code_int}")
 
             if determined_services:
+                # Note: Service 789 is now provided from JSON (AdditionalServices[]) via transformation service
+                # Auto-determination logic removed to match methodology
 
-                # Auto-determine service 789 from service 123 (Step 4.6)
-                determined_services = xlsx_dmn_processor.determine_service_789_from_123(determined_services)
-                has_789 = any(s['code'] == 789 for s in determined_services)
-                if has_789:
-                    rules_applied.append("[STEP 4.6] Service 789 auto-determined from service 123")
-                    logger.info("[STEP 4.6] Auto-added service 789 (Wartezeit) from service 123")
-
-                # Step 2: Price each service using XLSX pricing
+                logger.info("")
+                logger.info("="*80)
+                logger.info("💰 [STEP 6] PRICING DETERMINED SERVICES")
+                logger.info("="*80)
+                # STEP 6: Price each determined service (all are additional services: 111, 222, 444, 456, etc.)
                 for service in determined_services:
                     service_code = str(service['code'])
                     all_applicable_services.append(service_code)
+                    quantity = service.get('quantity_netto', 1)
 
-                    # Determine if this is main or additional service
-                    if service_code == '111':  # Main service
-                        price_result = xlsx_price_loader.get_main_service_price_advanced(
-                            customer_code=customer_code or 'UNKNOWN',
-                            customer_group=customer_data.get('customer_group', '30') if customer_data else '30',
-                            offer_number='',
-                            departure_country='DE',
+                    # Check if service has pre-determined pricing (e.g., service 789 from auto-determination)
+                    if 'price_per_unit' in service and 'total_amount' in service:
+                        # Use pre-determined pricing (e.g., service 789: €50/unit hardcoded per methodology)
+                        price_result = {
+                            'price_per_unit': service['price_per_unit'],
+                            'total_price': service['total_amount'],
+                            'quantity': quantity
+                        }
+                        logger.info(f"[STEP 6] Using pre-determined price for service {service_code}: {quantity} × €{price_result['price_per_unit']} = €{price_result['total_price']}")
+                    else:
+                        # Look up pricing from XLSX
+                        # Note: Additional services XLSX has different column order than main
+                        # For additional: col2=Kundennummer, col3=Kundengruppe, col4=Angebotsnummer
+                        price_result = xlsx_price_loader.get_additional_service_price_advanced(
+                            service_code=service_code,
+                            customer_code=service_order.freightpayer_code or '',  # Kundennummer
+                            customer_group='',  # Kundengruppe (empty)
                             departure_station=service_order.departure_station or '',
-                            tariff_point_dep='',
-                            destination_country='DE',
                             destination_station=service_order.destination_station or '',
-                            tariff_point_dest='',
-                            direction='Export',
                             loading_status=service_order.loading_status or 'beladen',
                             transport_form=service_order.transport_type,
                             container_length='20',
-                            weight_class=service_order.weight_class,
-                            service_date=service_order.departure_date or ''
+                            service_date=service_order.departure_date or '',
+                            quantity=quantity
                         )
 
-                        if price_result:
-                            pricing = PricingResult(
-                                service_code=service_code,
-                                service_name=service['name'],
-                                description=f"{service['name']} (XLSX: specificity {price_result['specificity']})",
-                                base_price=price_result['price'],
-                                calculated_amount=price_result['price'],
-                                currency="EUR",
-                                price_source="xlsx_main"
-                            )
-                            services.append(pricing)
-                            total_amount += price_result['price']
-                            logger.info(f"[STEP 5] Main service {service_code}: €{price_result['price']} (specificity: {price_result['specificity']})")
-                        else:
-                            warnings.append(f"Main service price not found for {service_code}")
-
-                    else:  # Additional service
-                        quantity = service.get('quantity_netto', 1)
-
-                        # Check if service has pre-determined pricing (e.g., service 789 from auto-determination)
-                        if 'price_per_unit' in service and 'total_amount' in service:
-                            # Use pre-determined pricing (e.g., service 789: €50/unit hardcoded per methodology)
-                            price_result = {
-                                'price_per_unit': service['price_per_unit'],
-                                'total_price': service['total_amount'],
-                                'quantity': quantity
-                            }
-                            logger.info(f"[STEP 6] Using pre-determined price for service {service_code}: {quantity} × €{price_result['price_per_unit']} = €{price_result['total_price']}")
-                        else:
-                            # Look up pricing from XLSX
-                            price_result = xlsx_price_loader.get_additional_service_price_advanced(
-                                service_code=service_code,
-                                customer_code=customer_code or 'UNKNOWN',
-                                customer_group=customer_data.get('customer_group', '30') if customer_data else '30',
-                                departure_station=service_order.departure_station or '',
-                                destination_station=service_order.destination_station or '',
-                                loading_status=service_order.loading_status or 'beladen',
-                                transport_form=service_order.transport_type,
-                                container_length='20',
-                                service_date=service_order.departure_date or '',
-                                quantity=quantity
-                            )
-
-                        if price_result:
-                            pricing = PricingResult(
-                                service_code=service_code,
-                                service_name=service['name'],
-                                description=f"{service['name']} (XLSX: {price_result['quantity']}x €{price_result['price_per_unit']})",
-                                base_price=price_result['price_per_unit'],
-                                calculated_amount=price_result['total_price'],
-                                currency="EUR",
-                                price_source="xlsx_additional"
-                            )
-                            services.append(pricing)
-                            total_amount += price_result['total_price']
-                            logger.info(f"[STEP 6] Additional service {service_code}: {price_result['quantity']} × €{price_result['price_per_unit']} = €{price_result['total_price']}")
-                        else:
-                            # No hardcoded fallbacks - service is determined but not priced (per methodology)
-                            logger.info(f"[STEP 6] Service {service_code} determined but has no pricing in XLSX - skipped")
-                            warnings.append(f"Service {service_code} determined but not priced (no XLSX match)")
+                    if price_result:
+                        pricing = PricingResult(
+                            service_code=service_code,
+                            service_name=service['name'],
+                            description=f"{service['name']} (XLSX: {price_result['quantity']}x €{price_result['price_per_unit']})",
+                            base_price=price_result['price_per_unit'],
+                            calculated_amount=price_result['total_price'],
+                            currency="EUR",
+                            price_source="xlsx_additional"
+                        )
+                        services.append(pricing)
+                        total_amount += price_result['total_price']
+                        logger.info(f"[STEP 6] Additional service {service_code}: {price_result['quantity']} × €{price_result['price_per_unit']} = €{price_result['total_price']}")
+                    else:
+                        # No hardcoded fallbacks - service is determined but not priced (per methodology)
+                        logger.info(f"[STEP 6] Service {service_code} determined but has no pricing in XLSX - skipped")
+                        warnings.append(f"Service {service_code} determined but not priced (no XLSX match)")
 
             else:
                 warnings.append(f"No services determined for {service_order.service_type}")
@@ -803,8 +831,18 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
         processing_time = (time.time() - start_time) * 1000
 
         # Log final total (Step 8 will add tax in billing service)
-        logger.info(f"[STEP 8 - Subtotal] Final service total: €{total_amount} (before tax)")
-        logger.info(f"Rating completed in {processing_time:.2f}ms")
+        logger.info("")
+        logger.info("="*80)
+        logger.info("📊 FINAL CALCULATION SUMMARY")
+        logger.info("="*80)
+        logger.info(f"Services priced: {len(services)}")
+        for svc in services:
+            logger.info(f"   {svc.service_code}: €{svc.calculated_amount}")
+        logger.info(f"SUBTOTAL: €{total_amount} (before tax)")
+        logger.info(f"EXPECTED: €483 (per methodology)")
+        logger.info(f"DIFFERENCE: €{483 - total_amount}")
+        logger.info(f"Processing time: {processing_time:.2f}ms")
+        logger.info("="*80)
 
         # Create service determination result
         service_determination = ServiceDeterminationResult(

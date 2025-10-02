@@ -20,8 +20,8 @@ sys.path.append(str(project_root / "services" / "rating"))
 sys.path.append(str(project_root / "services" / "billing"))
 
 def load_sample_order() -> Dict[str, Any]:
-    """Load the sample order from requirement documents"""
-    order_file = project_root.parent / "Requirement documents" / "1_operative_Auftragsdaten.json"
+    """Load the sample order from shared test orders"""
+    order_file = project_root.parent / "shared" / "test_orders" / "1_operative_Auftragsdaten.json"
 
     if not order_file.exists():
         raise FileNotFoundError(f"Sample order file not found: {order_file}")

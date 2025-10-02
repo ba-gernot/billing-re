@@ -274,6 +274,7 @@ async function callRatingService(transformationResult, logger, traceId) {
     {
       service_type: transformationResult.main_service.service_type,
       customer_code: transformationResult.main_service.customer_code,
+      freightpayer_code: transformationResult.main_service.freightpayer_code,  // ADDED
       weight_class: calculateWeightClass(transformationResult.main_service),
       transport_type: transformationResult.main_service.transport_type,
       dangerous_goods_flag: transformationResult.main_service.dangerous_goods_flag,
@@ -285,6 +286,7 @@ async function callRatingService(transformationResult, logger, traceId) {
     ...transformationResult.trucking_services.map(service => ({
       service_type: service.service_type,
       customer_code: service.customer_code,
+      freightpayer_code: service.freightpayer_code,  // ADDED
       weight_class: calculateWeightClass(service),
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,
@@ -296,6 +298,7 @@ async function callRatingService(transformationResult, logger, traceId) {
     ...transformationResult.additional_services.map(service => ({
       service_type: service.service_type,
       customer_code: service.customer_code,
+      freightpayer_code: service.freightpayer_code,  // ADDED
       weight_class: calculateWeightClass(service),
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,

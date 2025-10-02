@@ -669,20 +669,19 @@ class XLSXDMNProcessor:
             quantity_netto = additional_service_123_data.get('amount_netto', 5)
             quantity_brutto = additional_service_123_data.get('amount_brutto', 8)
 
-        # Add service 789
+        # Add service 789 (pricing will be looked up from XLSX by rating service)
         service_789 = {
             'code': 789,
             'name': 'Wartezeit Export',
             'rule_matched': 'Auto-determined from service 123',
             'quantity_netto': quantity_netto,
             'quantity_brutto': quantity_brutto,
-            'unit': 'Einheit',
-            'price_per_unit': 50.0,  # From hardcoded_prices_383.sql
-            'total_amount': quantity_netto * 50.0  # €250
+            'unit': 'Einheit'
+            # Note: price_per_unit and total_amount removed - will be looked up from XLSX pricing table
         }
 
         services.append(service_789)
-        logger.info(f"Auto-determined service 789 (Wartezeit Export): {quantity_netto} units × €50 = €{service_789['total_amount']}")
+        logger.info(f"Auto-determined service 789 (Wartezeit Export): {quantity_netto} units (pricing from XLSX)")
 
         return services
 

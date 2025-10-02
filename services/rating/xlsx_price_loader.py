@@ -191,6 +191,13 @@ class XLSXPriceLoader:
             # 12: Preisraster, 13: Container Länge, 14: Gewichtsklasse,
             # 15: gültig von, 16: gültig bis, 17: Preis, 18: Preiseinheit
 
+            logger.info(f"🔍 [XLSX MAIN] Looking up price for:")
+            logger.info(f"   Customer Code: '{customer_code}' | Customer Group: '{customer_group}'")
+            logger.info(f"   Weight Class: '{weight_class}' | Direction: '{direction}' | Container: '{container_length}'")
+            logger.info(f"   Stations: {departure_station} → {destination_station}")
+            logger.info(f"   Loading: '{loading_status}' | Transport: '{transport_form}'")
+            logger.info(f"   Service Date: '{service_date}'")
+
             matches = []
 
             for row_idx in range(2, ws.max_row + 1):
@@ -203,35 +210,66 @@ class XLSXPriceLoader:
 
                 # Calculate specificity score
                 specificity = 0
+                match_reasons = []
 
                 # Customer number match (most specific) = +1000
-                if row[2] and str(row[2]) == str(customer_code):
-                    specificity += 1000
+                # Note: customer_code might be customer OR freightpayer (passed as same param)
+                if row[2]:  # Row has customer number specified
+                    if customer_code and str(row[2]) == str(customer_code):
+                        specificity += 1000
+                        match_reasons.append(f"Customer#{row[2]}=+1000")
+                    else:
+                        # Row is for a different customer - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Customer mismatch (row={row[2]}, need={customer_code})")
+                        continue
                 # Customer group match = +100
-                elif row[1] and str(row[1]) == str(customer_group):
-                    specificity += 100
+                elif row[1]:  # Row has customer group specified
+                    if customer_group and str(row[1]) == str(customer_group):
+                        specificity += 100
+                        match_reasons.append(f"Group#{row[1]}=+100")
+                    else:
+                        # Row is for a different customer group - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Customer group mismatch (row={row[1]}, need={customer_group})")
+                        continue
                 # Offer number match = +50
-                elif row[0] and str(row[0]) == str(offer_number):
-                    specificity += 50
+                elif row[0]:  # Row has offer number specified
+                    if offer_number and str(row[0]) == str(offer_number):
+                        specificity += 50
+                        match_reasons.append(f"Offer#{row[0]}=+50")
+                    else:
+                        # Row is for a different offer - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Offer mismatch (row={row[0]}, need={offer_number})")
+                        continue
+
+                # If no customer/group/offer match, this is a generic row
+                if not row[0] and not row[1] and not row[2]:
+                    match_reasons.append("GENERIC_ROW")
 
                 # Station matches = +10 each
                 if row[4] and str(row[4]) == str(departure_station):
                     specificity += 10
+                    match_reasons.append(f"DepStn={row[4]}=+10")
                 if row[7] and str(row[7]) == str(destination_station):
                     specificity += 10
+                    match_reasons.append(f"DestStn={row[7]}=+10")
 
                 # Tariff point matches = +5 each
                 if row[5] and str(row[5]) == str(tariff_point_dep):
                     specificity += 5
+                    match_reasons.append(f"DepTP={row[5]}=+5")
                 if row[8] and str(row[8]) == str(tariff_point_dest):
                     specificity += 5
+                    match_reasons.append(f"DestTP={row[8]}=+5")
 
                 # Required matches (must match, no specificity bonus)
                 if row[9] and str(row[9]) != direction:
+                    logger.debug(f"   Row {row_idx}: ❌ Direction mismatch (row={row[9]}, need={direction})")
                     continue  # No match
                 if row[14] and str(row[14]) != weight_class:
+                    logger.debug(f"   Row {row_idx}: ❌ Weight class mismatch (row={row[14]}, need={weight_class})")
                     continue  # No match
                 if row[13] and str(row[13]) != str(container_length):
+                    logger.debug(f"   Row {row_idx}: ❌ Container length mismatch (row={row[13]}, need={container_length})")
                     continue  # No match
 
                 # Optional matches (add small specificity if they match)
@@ -251,9 +289,9 @@ class XLSXPriceLoader:
                 except (ValueError, TypeError):
                     pass
 
-                # If we have any specificity, this is a match
-                if specificity > 0 and row[17]:
-                    matches.append({
+                # Match if we have a price (allows generic rows with specificity=0)
+                if row[17]:
+                    price_match = {
                         'specificity': specificity,
                         'price': float(row[17]),
                         'price_unit': row[18] if row[18] else 'Container',
@@ -261,17 +299,21 @@ class XLSXPriceLoader:
                         'customer_number': row[2],
                         'customer_group': row[1],
                         'matched_criteria': specificity
-                    })
+                    }
+                    matches.append(price_match)
+                    logger.info(f"   Row {row_idx}: ✅ MATCH (specificity={specificity}) €{row[17]} | {', '.join(match_reasons)}")
 
             # Sort by specificity (highest first)
             matches.sort(key=lambda x: x['specificity'], reverse=True)
 
             if matches:
                 best_match = matches[0]
-                logger.info(f"Main service price match (specificity={best_match['specificity']}): €{best_match['price']}")
+                logger.info(f"🎯 [XLSX MAIN] Best match (specificity={best_match['specificity']}): €{best_match['price']}")
+                logger.info(f"   Total matches found: {len(matches)}")
                 return best_match
 
-            logger.warning(f"No main service price match for: {customer_code}, {weight_class}, {direction}")
+            logger.warning(f"❌ [XLSX MAIN] No price match found!")
+            logger.warning(f"   Searched: customer_code='{customer_code}', weight_class='{weight_class}', direction='{direction}'")
             return None
 
         except Exception as e:
@@ -363,6 +405,12 @@ class XLSXPriceLoader:
             # 9: Ladezustand, 10: Verkehrsform, ...
             # 15: Container Länge, 16: gültig von, 17: gültig bis, 18: Preisbasis, 19: Preis
 
+            logger.info(f"🔍 [XLSX ADDITIONAL] Looking up service {service_code}:")
+            logger.info(f"   Customer Code: '{customer_code}' | Customer Group: '{customer_group}'")
+            logger.info(f"   Stations: {departure_station} → {destination_station}")
+            logger.info(f"   Loading: '{loading_status}' | Transport: '{transport_form}' | Container: '{container_length}'")
+            logger.info(f"   Quantity: {quantity} | Service Date: '{service_date}'")
+
             matches = []
 
             for row_idx in range(2, ws.max_row + 1):
@@ -379,27 +427,49 @@ class XLSXPriceLoader:
 
                 # Calculate specificity score
                 specificity = 0
+                match_reasons = []
 
                 # Customer number match = +1000
-                if customer_code and row[2] and str(row[2]) == str(customer_code):
-                    specificity += 1000
+                if row[2]:  # Row has customer number specified
+                    if customer_code and str(row[2]) == str(customer_code):
+                        specificity += 1000
+                        match_reasons.append(f"Customer#{row[2]}=+1000")
+                    else:
+                        # Row is for a different customer - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Customer mismatch (row={row[2]}, need={customer_code})")
+                        continue
                 # Customer group match = +100
-                elif customer_group and row[3] and str(row[3]) == str(customer_group):
-                    specificity += 100
+                elif row[3]:  # Row has customer group specified
+                    if customer_group and str(row[3]) == str(customer_group):
+                        specificity += 100
+                        match_reasons.append(f"Group#{row[3]}=+100")
+                    else:
+                        # Row is for a different customer group - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Customer group mismatch (row={row[3]}, need={customer_group})")
+                        continue
+
+                # If no customer/group match, this is a generic row
+                if not row[2] and not row[3] and not row[4]:
+                    match_reasons.append("GENERIC_ROW")
 
                 # Station matches = +10 each
                 if departure_station and row[6] and str(row[6]) == str(departure_station):
                     specificity += 10
+                    match_reasons.append(f"DepStn={row[6]}=+10")
                 if destination_station and row[8] and str(row[8]) == str(destination_station):
                     specificity += 10
+                    match_reasons.append(f"DestStn={row[8]}=+10")
 
                 # Optional matches
                 if loading_status and row[9] and str(row[9]) == loading_status:
                     specificity += 2
+                    match_reasons.append(f"Loading={row[9]}=+2")
                 if transport_form and row[10] and str(row[10]) == transport_form:
                     specificity += 2
+                    match_reasons.append(f"Transport={row[10]}=+2")
                 if container_length and row[15] and str(row[15]) == str(container_length):
                     specificity += 2
+                    match_reasons.append(f"Container={row[15]}=+2")
 
                 # Date range validation
                 if service_date and row[16] and row[17]:
@@ -424,24 +494,27 @@ class XLSXPriceLoader:
                     else:
                         total_price = price_per_unit  # Container-based, quantity doesn't apply
 
-                    matches.append({
+                    price_match = {
                         'specificity': specificity,
                         'price_per_unit': price_per_unit,
                         'quantity': quantity if price_basis.lower() in ['einheit', 'unit', 'per_unit'] else 1,
                         'total_price': total_price,
                         'price_basis': price_basis,
                         'service_name': row[1] if row[1] else f"Service {service_code}"
-                    })
+                    }
+                    matches.append(price_match)
+                    logger.info(f"   Row {row_idx}: ✅ MATCH (specificity={specificity}) €{price_per_unit} × {quantity if price_basis.lower() in ['einheit', 'unit', 'per_unit'] else 1} = €{total_price} | {', '.join(match_reasons)}")
 
             # Sort by specificity (highest first)
             matches.sort(key=lambda x: x['specificity'], reverse=True)
 
             if matches:
                 best_match = matches[0]
-                logger.info(f"Additional service {service_code} price match: €{best_match['price_per_unit']} × {best_match['quantity']} = €{best_match['total_price']}")
+                logger.info(f"🎯 [XLSX ADDITIONAL] Best match for service {service_code} (specificity={best_match['specificity']}): €{best_match['price_per_unit']} × {best_match['quantity']} = €{best_match['total_price']}")
+                logger.info(f"   Total matches found: {len(matches)}")
                 return best_match
 
-            logger.warning(f"No additional service price match for: {service_code}")
+            logger.warning(f"❌ [XLSX ADDITIONAL] No price match found for service {service_code}")
             return None
 
         except Exception as e:
