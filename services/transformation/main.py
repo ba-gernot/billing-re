@@ -180,6 +180,44 @@ async def transform_order(order_input: OperationalOrderInput):
 async def _decompose_to_services(order_input: OperationalOrderInput, enriched_container: dict, validation_data: dict) -> dict:
     """Enhanced service decomposition with business rules from roadmap"""
 
+    # Extract geography data from Order JSON (NO hardcoded values)
+    container = order_input.order.container
+    transport_direction = container.transport_direction or "Export"
+
+    # Safely extract country codes (TakeOver/HandOver may be optional)
+    departure_country = "DE"  # Default fallback
+    if container.take_over:
+        try:
+            departure_country = container.take_over.departure_country_iso_code
+            print(f"✅ Extracted departure_country: {departure_country}")
+        except (AttributeError, TypeError) as e:
+            print(f"⚠️ Could not extract departure_country: {e}")
+
+    destination_country = "DE"  # Default fallback
+    if container.hand_over:
+        try:
+            destination_country = container.hand_over.destination_country_iso_code
+            print(f"✅ Extracted destination_country: {destination_country}")
+        except (AttributeError, TypeError) as e:
+            print(f"⚠️ Could not extract destination_country: {e}")
+
+    print(f"🌍 Final geography: {departure_country} → {destination_country} ({transport_direction})")
+
+    # Extract tariff points from trucking waypoints (if available)
+    tariff_point_dep = None
+    tariff_point_dest = None
+    if container.trucking_services and len(container.trucking_services) > 0:
+        for waypoint in container.trucking_services[0].waypoints:
+            if waypoint.waypoint_type == "Depot":
+                tariff_point_dep = waypoint.tariff_point
+            elif waypoint.waypoint_type == "Bahnstelle":
+                tariff_point_dest = waypoint.tariff_point
+
+    # Customer group lookup (database or empty for generic XLSX match)
+    customer_group = ""
+    if validation_data.get("customer"):
+        customer_group = validation_data["customer"].get("group", "")
+
     # Enhanced base fields using validation and enrichment data
     base_fields = {
         "order_reference": order_input.order.order_reference,
@@ -194,7 +232,14 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
         "destination_station": order_input.order.container.rail_service.destination_terminal.railway_station_number,
         "departure_date": order_input.order.container.rail_service.departure_date,
         "dangerous_goods_flag": enriched_container["dangerous_goods"],
-        "original_order_reference": order_input.order.order_reference
+        "original_order_reference": order_input.order.order_reference,
+        # Geography & Route Details (from Order JSON - no hardcoded values)
+        "departure_country": departure_country,
+        "destination_country": destination_country,
+        "transport_direction": transport_direction,
+        "tariff_point_dep": tariff_point_dep,
+        "tariff_point_dest": tariff_point_dest,
+        "customer_group": customer_group,
     }
 
     # 1. MAIN SERVICE - Always created

@@ -45,6 +45,14 @@ class ServiceOrderOutput(BaseModel):
     destination_station: str
     departure_date: datetime
 
+    # Geography & Route Details (from Order JSON - no hardcoded values)
+    departure_country: str = Field(..., description="From Container.TakeOver.DepartureCountryIsoCode")
+    destination_country: str = Field(..., description="From Container.HandOver.DestinationCountryIsoCode")
+    transport_direction: str = Field(..., description="From Container.TransportDirection (Export/Import/Domestic)")
+    tariff_point_dep: Optional[str] = Field(None, description="From TruckingServices.Waypoints.TariffPoint (departure)")
+    tariff_point_dest: Optional[str] = Field(None, description="From TruckingServices.Waypoints.TariffPoint (destination)")
+    customer_group: Optional[str] = Field(None, description="From database lookup or empty for generic XLSX match")
+
     # Service-specific fields
     type_of_trip: Optional[TypeOfTrip] = None
     trucking_code: Optional[str] = None

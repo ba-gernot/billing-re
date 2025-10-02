@@ -378,7 +378,7 @@ async def _calculate_advanced_tax(transport_direction: str, subtotal: float,
     try:
         tax_rule = await billing_db.get_tax_rules(
             transport_direction=transport_direction,
-            from_country="DE",  # Assume German origin
+            from_country=billing_input.departure_country or "DE",  # Use passed country (not hardcoded)
             to_country=customer_country
         )
 

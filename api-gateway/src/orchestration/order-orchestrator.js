@@ -270,36 +270,54 @@ async function callRatingService(transformationResult, logger, traceId) {
   const url = `${process.env.RATING_SERVICE_URL}/rate-xlsx`;
 
   // Convert transformation result to rating service input format
+  // Note: weight_class is NOT passed - rating service calculates it via XLSX rules
   const serviceOrders = [
     {
       service_type: transformationResult.main_service.service_type,
       customer_code: transformationResult.main_service.customer_code,
-      freightpayer_code: transformationResult.main_service.freightpayer_code,  // ADDED
-      weight_class: calculateWeightClass(transformationResult.main_service),
+      freightpayer_code: transformationResult.main_service.freightpayer_code,
+      length: transformationResult.main_service.length,
+      gross_weight: transformationResult.main_service.gross_weight,
       transport_type: transformationResult.main_service.transport_type,
       dangerous_goods_flag: transformationResult.main_service.dangerous_goods_flag,
       departure_date: transformationResult.main_service.departure_date,
       departure_station: transformationResult.main_service.departure_station,
       destination_station: transformationResult.main_service.destination_station,
-      loading_status: transformationResult.main_service.loading_status
+      loading_status: transformationResult.main_service.loading_status,
+      // Geography & Route Details (from transformation - no hardcoded values)
+      departure_country: transformationResult.main_service.departure_country,
+      destination_country: transformationResult.main_service.destination_country,
+      transport_direction: transformationResult.main_service.transport_direction,
+      tariff_point_dep: transformationResult.main_service.tariff_point_dep,
+      tariff_point_dest: transformationResult.main_service.tariff_point_dest,
+      customer_group: transformationResult.main_service.customer_group,
     },
     ...transformationResult.trucking_services.map(service => ({
       service_type: service.service_type,
       customer_code: service.customer_code,
-      freightpayer_code: service.freightpayer_code,  // ADDED
-      weight_class: calculateWeightClass(service),
+      freightpayer_code: service.freightpayer_code,
+      length: service.length,
+      gross_weight: service.gross_weight,
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,
       departure_date: service.departure_date,
       departure_station: service.departure_station,
       destination_station: service.destination_station,
-      loading_status: service.loading_status
+      loading_status: service.loading_status,
+      // Geography & Route Details
+      departure_country: service.departure_country,
+      destination_country: service.destination_country,
+      transport_direction: service.transport_direction,
+      tariff_point_dep: service.tariff_point_dep,
+      tariff_point_dest: service.tariff_point_dest,
+      customer_group: service.customer_group,
     })),
     ...transformationResult.additional_services.map(service => ({
       service_type: service.service_type,
       customer_code: service.customer_code,
-      freightpayer_code: service.freightpayer_code,  // ADDED
-      weight_class: calculateWeightClass(service),
+      freightpayer_code: service.freightpayer_code,
+      length: service.length,
+      gross_weight: service.gross_weight,
       transport_type: service.transport_type,
       dangerous_goods_flag: service.dangerous_goods_flag,
       departure_date: service.departure_date,
@@ -307,7 +325,14 @@ async function callRatingService(transformationResult, logger, traceId) {
       destination_station: service.destination_station,
       loading_status: service.loading_status,
       additional_service_code: service.additional_service_code,
-      quantity: service.quantity
+      quantity: service.quantity,
+      // Geography & Route Details
+      departure_country: service.departure_country,
+      destination_country: service.destination_country,
+      transport_direction: service.transport_direction,
+      tariff_point_dep: service.tariff_point_dep,
+      tariff_point_dest: service.tariff_point_dest,
+      customer_group: service.customer_group,
     }))
   ];
 
@@ -344,21 +369,24 @@ async function callBillingService(ratingResult, originalOrder, logger, traceId) 
   const container = originalOrder.Order.Container;
   const railService = container.RailService || {};
 
+  // Get geography data from first rated service (already extracted by transformation service)
+  const firstService = ratingResult.services?.[0] || {};
+
   // Convert rating result to billing service input format
   const billingInput = {
     order_reference: ratingResult.order_reference,
     customer_code: originalOrder.Order.Customer.Code,
-    transport_direction: container.TransportDirection,
+    transport_direction: firstService.transport_direction || container.TransportDirection,
     route_from: railService.DepartureTerminal?.RailwayStationNumber,
     route_to: railService.DestinationTerminal?.RailwayStationNumber,
     departure_date: railService.DepartureDate,
     operational_order_id: originalOrder.Order.OrderReference,
-    // Tax calculation fields for XLSX processor
-    departure_country: 'DE',
-    destination_country: container.TransportDirection === 'Export' ? 'US' : 'DE',
+    // Tax calculation fields - use already-extracted data from transformation service
+    departure_country: firstService.departure_country || 'DE',
+    destination_country: firstService.destination_country || 'DE',
     vat_id: originalOrder.Order.Customer.VatId || null,
     customs_procedure: originalOrder.Order.CustomsProcedure || null,
-    loading_status: container.LoadingStatus || 'beladen',
+    loading_status: firstService.loading_status || 'beladen',
     line_items: ratingResult.services.map(service => ({
       service_code: service.service_code,
       service_name: service.service_name,
@@ -397,18 +425,7 @@ async function callBillingService(ratingResult, originalOrder, logger, traceId) 
   }
 }
 
-function calculateWeightClass(serviceOrder) {
-  // Extract weight class from service order based on container length and gross weight
-  const length = serviceOrder.length;
-  const grossWeight = serviceOrder.gross_weight;
-
-  if (length === "20") {
-    return grossWeight <= 20000 ? "20A" : "20B";
-  } else if (length === "40") {
-    return grossWeight <= 25000 ? "40A" : "40B";
-  } else {
-    return "20A"; // Default fallback
-  }
-}
+// calculateWeightClass function REMOVED - weight class is calculated by rating service via XLSX rules
+// No duplicate business logic in orchestrator - all rules in XLSX files
 
 module.exports = { orchestrateOrderProcessing };

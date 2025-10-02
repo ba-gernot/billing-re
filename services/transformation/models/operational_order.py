@@ -66,6 +66,20 @@ class AdditionalService(BaseModel):
     unit: Optional[str] = Field(None, alias="Unit", description="Unit of measurement")
 
 
+class TakeOver(BaseModel):
+    """Container take-over location (departure)"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    departure_country_iso_code: str = Field(..., alias="DepartureCountryIsoCode", description="Departure country ISO code")
+
+
+class HandOver(BaseModel):
+    """Container hand-over location (destination)"""
+    model_config = ConfigDict(populate_by_name=True)
+
+    destination_country_iso_code: str = Field(..., alias="DestinationCountryIsoCode", description="Destination country ISO code")
+
+
 class Container(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -74,6 +88,8 @@ class Container(BaseModel):
     container_type_iso_code: str = Field(..., alias="ContainerTypeIsoCode")
     tare_weight: str = Field(..., alias="TareWeight")
     payload: str = Field(..., alias="Payload")
+    take_over: Optional[TakeOver] = Field(None, alias="TakeOver", description="Container take-over location with country")
+    hand_over: Optional[HandOver] = Field(None, alias="HandOver", description="Container hand-over location with country")
     rail_service: RailService = Field(..., alias="RailService")
     trucking_services: List[TruckingService] = Field(..., alias="TruckingServices")
     additional_services: List[AdditionalService] = Field(..., alias="AdditionalServices")

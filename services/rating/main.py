@@ -88,6 +88,13 @@ class ServiceOrderInput(BaseModel):
     container_length: Optional[str] = None  # "20" or "40" (alias: length)
     length: Optional[str] = None  # Alternative field name from transformation service
     gross_weight: Optional[int] = None  # in kg
+    # Geography & Route Details (from transformation service - no hardcoded values)
+    departure_country: Optional[str] = None
+    destination_country: Optional[str] = None
+    transport_direction: Optional[str] = None  # Export/Import/Domestic
+    tariff_point_dep: Optional[str] = None
+    tariff_point_dest: Optional[str] = None
+    customer_group: Optional[str] = None
 
 
 class PricingResult(BaseModel):
@@ -702,17 +709,18 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
                 # - Kundennummer (col 2) = Order.Freightpayer.Code
                 freightpayer_code = service_order.freightpayer_code or ''
                 logger.info(f"DEBUG: Angebotsnummer={customer_code}, Kundennummer={freightpayer_code}")
+                # ALL parameters from service_order (NO hardcoded values)
                 main_transport_price = xlsx_price_loader.get_main_service_price_advanced(
                     customer_code=freightpayer_code,  # Kundennummer column
-                    customer_group='',  # Kundengruppe column (empty - not in JSON)
+                    customer_group=service_order.customer_group or '',  # Kundengruppe column (from order/database)
                     offer_number=customer_code or '',  # Angebotsnummer column
-                    departure_country='DE',
+                    departure_country=service_order.departure_country or 'DE',
                     departure_station=service_order.departure_station or '',
-                    tariff_point_dep='',
-                    destination_country='DE',
+                    tariff_point_dep=service_order.tariff_point_dep or '',
+                    destination_country=service_order.destination_country or 'DE',
                     destination_station=service_order.destination_station or '',
-                    tariff_point_dest='',
-                    direction='Export',
+                    tariff_point_dest=service_order.tariff_point_dest or '',
+                    direction=service_order.transport_direction or 'Export',
                     loading_status=service_order.loading_status or 'beladen',
                     transport_form=service_order.transport_type,
                     container_length=container_length or '20',
@@ -797,7 +805,7 @@ async def rate_services_xlsx(service_orders: List[ServiceOrderInput]):
                         price_result = xlsx_price_loader.get_additional_service_price_advanced(
                             service_code=service_code,
                             customer_code=service_order.freightpayer_code or '',  # Kundennummer
-                            customer_group='',  # Kundengruppe (empty)
+                            customer_group=service_order.customer_group or '',  # Kundengruppe (from order/database)
                             departure_station=service_order.departure_station or '',
                             destination_station=service_order.destination_station or '',
                             loading_status=service_order.loading_status or 'beladen',

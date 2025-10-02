@@ -24,6 +24,12 @@ const orderSchema = z.object({
       Payload: z.string(),
       TransportDirection: z.enum(['Export', 'Import', 'Domestic']),
       DangerousGoodFlag: z.enum(['J', 'N']),
+      TakeOver: z.object({
+        DepartureCountryIsoCode: z.string()
+      }).optional(),
+      HandOver: z.object({
+        DestinationCountryIsoCode: z.string()
+      }).optional(),
       RailService: z.object({
         DepartureDate: z.string(),
         DepartureTerminal: z.object({
