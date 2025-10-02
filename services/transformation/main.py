@@ -326,6 +326,7 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
 
         # For service 789, extract quantity from JSON (netto = brutto - 3 per methodology)
         if additional.code == "789":
+            # TODO: remove the hardcoded amount
             amount_brutto = int(additional.amount) if additional.amount else 8
             quantity = amount_brutto - 3  # Methodology: netto = brutto - 3 (5 = 8 - 3)
         else:

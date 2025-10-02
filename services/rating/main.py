@@ -249,16 +249,16 @@ async def _calculate_service_pricing(service_code: str, service_order: ServiceOr
             offer_code = price_info.get("offer_code")
 
     # Level 3: Hardcoded pricing (roadmap examples)
-    if not price_info:
-        hardcoded_prices = {
-            "111": {"price": 100.0, "description": "Generic main service"},
-            "222": {"price": 18.0, "description": "Trucking service - Zustellung"},
-            "444": {"price": 85.0, "description": "Standard KV service"},
-            "456": {"price": 15.0, "description": "Security service - KV dangerous"},
-            "333": {"price": 25.0, "description": "Station security"},
-            "555": {"price": 35.0, "description": "Customs documentation"},
-            "789": {"price": 250.0, "description": "Waiting time (5 units × €50)"}
-        }
+    # if not price_info:
+    #     hardcoded_prices = {
+    #         "111": {"price": 100.0, "description": "Generic main service"},
+    #         "222": {"price": 18.0, "description": "Trucking service - Zustellung"},
+    #         "444": {"price": 85.0, "description": "Standard KV service"},
+    #         "456": {"price": 15.0, "description": "Security service - KV dangerous"},
+    #         "333": {"price": 25.0, "description": "Station security"},
+    #         "555": {"price": 35.0, "description": "Customs documentation"},
+    #         "789": {"price": 250.0, "description": "Waiting time (5 units × €50)"}
+    #     }
 
         if service_code in hardcoded_prices:
             hardcoded = hardcoded_prices[service_code]
