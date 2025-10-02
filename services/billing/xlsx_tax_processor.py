@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 XLSX Tax Calculation Processor
-Reads tax rules from shared/2 Rules/3_1_Regeln_Steuerberechnung.xlsx
+Reads tax rules from shared/rules/3_1_Regeln_Steuerberechnung.xlsx
 Implements advanced tax determination based on transport conditions
 """
 
@@ -28,7 +28,7 @@ class XLSXTaxProcessor:
             current_file = Path(__file__).resolve()
             billing_service_dir = current_file.parent  # services/billing
             project_root = billing_service_dir.parent.parent  # services -> project_root
-            rules_dir = project_root / "shared" / "2 Rules"
+            rules_dir = project_root / "shared" / "rules"
 
         self.rules_dir = Path(rules_dir)
         self.tax_calculation_file = self.rules_dir / "3_1_Regeln_Steuerberechnung.xlsx"

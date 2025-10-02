@@ -252,7 +252,7 @@ class XLSXDMNProcessor:
         """
 
         # Load weight classification rules
-        rule_data = self.load_rule_file("weight_class.dmn.xlsx")
+        rule_data = self.load_rule_file("5_Regeln_Gewichtsklassen.xlsx")
         if not rule_data:
             logger.warning("Weight classification rules not loaded")
             return None
@@ -446,7 +446,7 @@ class XLSXDMNProcessor:
     def evaluate_service_determination_full(self, order_context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Evaluate service determination with full COLLECT policy support
-        Reads from 4_Regeln_Leistungsermittlung.xlsx in shared/2 Rules/
+        Reads from 4_Regeln_Leistungsermittlung.xlsx in shared/rules/
 
         Args:
             order_context: Dictionary with order details:
@@ -471,7 +471,7 @@ class XLSXDMNProcessor:
         """
 
         # Load service determination rules from configured rules directory
-        # The rules_dir should point to dmn-rules symlink which points to shared/2 Rules/
+        # The rules_dir should point to dmn-rules symlink which points to shared/rules/
         rules_path = self.rules_dir / "4_Regeln_Leistungsermittlung.xlsx"
 
         if not rules_path.exists():

@@ -62,6 +62,8 @@ class AdditionalService(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     code: str = Field(..., alias="Code", description="Additional service code")
+    amount: Optional[str] = Field(None, alias="Amount", description="Amount/quantity (brutto)")
+    unit: Optional[str] = Field(None, alias="Unit", description="Unit of measurement")
 
 
 class Container(BaseModel):

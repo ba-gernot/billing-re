@@ -40,9 +40,10 @@ class ContainerEnricher:
                 {"length_ft": 20, "max_gross_weight_kg": 23000}  # Default fallback
             )
 
-        # Determine weight category based on roadmap rules
+        # Container length (will be used by rating service for weight classification)
         length = str(container_info["length_ft"])
-        weight_category = self._determine_weight_category(length, gross_weight)
+        # Weight category will be determined by rating service using XLSX FEEL expressions (Step 2)
+        weight_category = None
 
         # Check dangerous goods
         dangerous_goods = container.dangerous_good_flag == "J"
@@ -59,11 +60,5 @@ class ContainerEnricher:
             "container_type_data": container_info
         }
 
-    def _determine_weight_category(self, length: str, gross_weight: int) -> str:
-        """Determine weight category based on roadmap rules"""
-        if length == "20":
-            return "20A" if gross_weight <= 20000 else "20B"
-        elif length == "40":
-            return "40A" if gross_weight <= 25000 else "40B"
-        else:
-            return "20A"  # Default fallback
+    # Removed _determine_weight_category method - weight classification now handled by rating service
+    # using XLSX FEEL expressions from 5_Regeln_Gewichtsklassen.xlsx (Methodology Step 2)

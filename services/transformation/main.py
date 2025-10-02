@@ -271,9 +271,27 @@ async def _decompose_to_services(order_input: OperationalOrderInput, enriched_co
                 print(f"Trucking service DB insertion failed: {e}")
 
     # 3. ADDITIONAL SERVICES - Based on additional services data
+    # Skip auto-determined services: 123 (from TruckingServices), 789 (auto from 123)
     additional_services = []
+    service_789_metadata = None  # Store metadata for auto-determination
+
     for i, additional in enumerate(order_input.order.container.additional_services):
-        # Determine quantity based on service type (roadmap example: waiting time = 5 units)
+        # Skip service 123 - it's auto-determined from TruckingServices
+        if additional.code == "123":
+            continue
+
+        # Skip service 789 but preserve metadata for auto-determination
+        if additional.code == "789":
+            # Extract Amount (brutto) from JSON, calculate netto = brutto - 3
+            amount_brutto = int(additional.amount) if additional.amount else 8
+            service_789_metadata = {
+                "amount_brutto": amount_brutto,
+                "amount_netto": amount_brutto - 3,  # Methodology: netto = brutto - 3
+                "unit": additional.unit or "Einheit"
+            }
+            continue
+
+        # For other additional services, create service orders normally
         quantity = _determine_additional_service_quantity(additional.code)
 
         additional_service = ServiceOrderOutput(

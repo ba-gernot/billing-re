@@ -44,7 +44,7 @@ class DMNTripTypeClassification:
             'transportType': transport_type or 'Standard'
         }
 
-        # Try DMN rule first: 2_Regeln_Fahrttyp
+        # Try DMN rule first: 3_Regeln_Fahrttyp
         trip_type = self._execute_trip_type_dmn(dmn_input)
 
         if not trip_type:
@@ -58,7 +58,7 @@ class DMNTripTypeClassification:
         """Execute DMN rule for trip type determination"""
         try:
             result = self.dmn_engine.execute_rule(
-                rule_name="2_Regeln_Fahrttyp",
+                rule_name="3_Regeln_Fahrttyp",
                 input_data=dmn_input,
                 use_cache=True
             )
@@ -170,9 +170,9 @@ class DMNTripTypeClassification:
 
     def get_rule_status(self) -> Dict[str, Any]:
         """Get status of trip type DMN rule"""
-        rule_info = self.dmn_engine.get_rule_info("2_Regeln_Fahrttyp")
+        rule_info = self.dmn_engine.get_rule_info("3_Regeln_Fahrttyp")
         return {
-            'rule_name': '2_Regeln_Fahrttyp',
+            'rule_name': '3_Regeln_Fahrttyp',
             'available': rule_info is not None,
             'loaded': rule_info.get('loaded', False) if rule_info else False,
             'last_modified': rule_info.get('modified') if rule_info else None,

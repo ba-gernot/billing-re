@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize XLSX tax processor with symlink path to shared rules
 current_dir = Path(__file__).parent
-rules_dir = current_dir / "shared" / "2 Rules"
+rules_dir = current_dir / "shared" / "rules"
 tax_processor = XLSXTaxProcessor(rules_dir=rules_dir)
 
 @asynccontextmanager
@@ -332,7 +332,7 @@ async def _calculate_advanced_tax(transport_direction: str, subtotal: float,
     2. Import: Reverse charge mechanism
     3. Domestic: 19% German VAT
 
-    Primary: XLSX processor (shared/2 Rules/3_1_Regeln_Steuerberechnung.xlsx)
+    Primary: XLSX processor (shared/rules/3_1_Regeln_Steuerberechnung.xlsx)
     Fallback: Database rules or hardcoded rules
     """
 

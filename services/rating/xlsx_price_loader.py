@@ -172,7 +172,7 @@ class XLSXPriceLoader:
         # We need to go up to project root, then to shared
         rating_service_dir = self.prices_dir.parent if 'price-tables' in str(self.prices_dir) else self.prices_dir
         project_root = rating_service_dir.parent.parent  # services/rating -> services -> project_root
-        shared_path = project_root / "shared" / "3 Prices" / "6_Preistabelle_Hauptleistungen_Einzelpreise.xlsx"
+        shared_path = project_root / "shared" / "rules" / "6_Preistabelle_Hauptleistungen_Einzelpreise.xlsx"
 
         if not shared_path.exists():
             logger.warning(f"Main service price table not found at {shared_path}")
@@ -345,7 +345,7 @@ class XLSXPriceLoader:
         # Load from shared folder - fix path resolution
         rating_service_dir = self.prices_dir.parent if 'price-tables' in str(self.prices_dir) else self.prices_dir
         project_root = rating_service_dir.parent.parent  # services/rating -> services -> project_root
-        shared_path = project_root / "shared" / "3 Prices" / "6_Preistabelle_Nebenleistungen.xlsx"
+        shared_path = project_root / "shared" / "rules" / "6_Preistabelle_Nebenleistungen.xlsx"
 
         if not shared_path.exists():
             logger.warning(f"Additional service price table not found at {shared_path}")
