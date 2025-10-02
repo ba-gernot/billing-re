@@ -8,6 +8,8 @@ import { Plus, FileText, DollarSign, AlertTriangle, CheckCircle } from 'lucide-r
 import { OrderProcessorForm } from '@/components/orders/order-processor-form'
 import { RecentOrders } from '@/components/orders/recent-orders'
 import { InvoicesSummary } from '@/components/invoices/invoices-summary'
+import { useServiceHealth } from '@/hooks/use-service-health'
+import { ServiceStatus } from '@/components/dashboard/service-status'
 
 // Color class mappings for Tailwind JIT compilation
 const colorClasses = {
@@ -33,6 +35,7 @@ type ColorKey = keyof typeof colorClasses
 
 export default function DashboardPage() {
   const [showOrderForm, setShowOrderForm] = useState(false)
+  const { health, isLoading } = useServiceHealth(30000) // Auto-refresh every 30 seconds
 
   const dashboardStats = [
     {
@@ -160,38 +163,38 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>System Status</CardTitle>
                 <CardDescription>
-                  Service health and performance
+                  Service health and performance (auto-refresh: 30s)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">API Gateway</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-600">Online</span>
+                {isLoading && !health ? (
+                  // Initial loading state
+                  <>
+                    <ServiceStatus name="api-gateway" status="loading" displayName="API Gateway" />
+                    <ServiceStatus name="transformation" status="loading" displayName="Transformation Service" />
+                    <ServiceStatus name="rating" status="loading" displayName="Rating Service" />
+                    <ServiceStatus name="billing" status="loading" displayName="Billing Service" />
+                  </>
+                ) : health ? (
+                  // Dynamic service status from API
+                  health.services.map((service) => (
+                    <ServiceStatus
+                      key={service.service}
+                      name={service.service}
+                      status={service.status}
+                      displayName={
+                        service.service === 'api-gateway'
+                          ? 'API Gateway'
+                          : `${service.service.charAt(0).toUpperCase() + service.service.slice(1)} Service`
+                      }
+                    />
+                  ))
+                ) : (
+                  // Fallback if health data unavailable
+                  <div className="text-sm text-gray-500">
+                    Unable to fetch service health status
                   </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Transformation Service</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-600">Online</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Rating Service</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-600">Online</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Billing Service</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-600">Online</span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
