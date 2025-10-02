@@ -109,3 +109,6 @@ credentials.json
 serviceAccountKey.json
 .credentials/.env
 .mcp.json
+
+# business rules
+shared/
