@@ -39,8 +39,24 @@ const orderSchema = z.object({
           RailwayStationNumber: z.string()
         })
       }),
-      TruckingServices: z.array(z.any()).optional(),
-      AdditionalServices: z.array(z.any()).optional()
+      TruckingServices: z.array(z.object({
+        SequenceNumber: z.string(),
+        Type: z.string(),
+        TruckingCode: z.string(),
+        Waypoints: z.array(z.object({
+          SequenceNumber: z.string(),
+          IsMainAdress: z.string(),
+          WayPointType: z.string(),
+          TariffPoint: z.string(),
+          AdressCode: z.string(),
+          DeliveryDate: z.string().optional()
+        }))
+      })).optional(),
+      AdditionalServices: z.array(z.object({
+        Code: z.string(),
+        Amount: z.string().optional(),
+        Unit: z.string().optional()
+      })).optional()
     })
   })
 });
