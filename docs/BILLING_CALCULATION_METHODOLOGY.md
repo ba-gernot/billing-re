@@ -63,7 +63,9 @@ The input is a JSON file with the following structure:
 
 ## Code Examples for XLSX Parsing
 
-This section provides Python code examples using `openpyxl` library to extract data from XLSX files.
+**NOTE:** This section provides **reference examples only** to illustrate XLSX file structure and parsing concepts using Python's `openpyxl` library.
+
+**The actual implementation** uses custom XLSX processors (`XLSXDMNProcessor`, `XLSXPriceLoader`, `XLSXTaxProcessor`) located in the services. These examples are provided for documentation and understanding purposes, not for direct use in the system.
 
 ### Installing Dependencies
 
@@ -868,7 +870,11 @@ The methodology should produce:
 
 ## Files Reference
 
-All XLSX files located in `shared/rules/`:
+All XLSX files are located in `shared/rules/` at the project root. Services access these files via symlinks:
+- **Rating Service**: `services/rating/shared/rules/` → `shared/rules/`
+- **Billing Service**: `services/billing/shared/rules/` → `shared/rules/`
+
+XLSX files used:
 1. `5_Regeln_Gewichtsklassen.xlsx` - Weight classification
 2. `3_Regeln_Fahrttyp.xlsx` - Trip type determination
 3. `4_Regeln_Leistungsermittlung.xlsx` - Service determination

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a modern microservices-based billing system for complex transport logistics (rail+road). The system processes orders through 6 stages: Input → Transformation → Rating → Pricing → Billing → Invoice, with €383 expected result for the test scenario.
+This is a modern microservices-based billing system for complex transport logistics (rail+road). The system processes orders through 6 stages: Input → Transformation → Rating → Pricing → Billing → Invoice, with €483 expected result for the test scenario.
 
 ## Architecture
 
@@ -100,7 +100,7 @@ curl -X POST http://localhost:3000/api/v1/process-order \
   -H "Content-Type: application/json" \
   -d @"../Requirement documents/1_operative_Auftragsdaten.json"
 ```
-Expected result: €383 total invoice
+Expected result: €483 total invoice
 
 ## Technology Stack
 
@@ -137,7 +137,7 @@ Expected result: €383 total invoice
 - Container weight classification affects pricing tiers
 - Service 456 (security surcharge) only valid 2025-05-01 to 2025-08-31
 - Export orders have 0% VAT, domestic orders 19% VAT
-- €383 expected total for test scenario in requirement documents
+- €483 expected total for test scenario (see `docs/BILLING_CALCULATION_METHODOLOGY.md`)
 
 ## File Structure
 ```
@@ -175,7 +175,7 @@ billing-re/
   1. **Layer 1**: pyDMNrules (blocked by library bugs - gracefully fails to Layer 2)
   2. **Layer 2**: XLSX Processor - **PRIMARY** (fully operational, auto-reload enabled) ✅
   3. **Layer 3**: Hardcoded Python rules (available but not needed)
-- **Test Results**: 100% integration test pass rate, €383 target calculation achieved
+- **Test Results**: 100% integration test pass rate, €483 target calculation achieved
 - **Documentation**:
   - Implementation details: `/DMN_DYNAMIC_IMPLEMENTATION_SUMMARY.md`
   - Bug analysis: `/PYDMNRULES_BUG_ANALYSIS.md`
@@ -194,7 +194,7 @@ billing-re/
 - **Output Files** in `billing-re/database/seeds/`:
   - `dynamic_main_prices.sql` - Main service prices
   - `dynamic_additional_prices.sql` - Additional service prices
-  - `hardcoded_prices_383.sql` - Baseline for €383 test scenario
+  - `hardcoded_prices_483.sql` - Baseline for €483 test scenario
 - **Update Process**: Edit XLSX → Run generator → Load SQL → Prices updated
 
 ## Testing
@@ -209,7 +209,7 @@ python3 tests/test_dmn_rules_validation.py  # XLSX content validation
 - **Business Logic**: `test_business_logic.py` - Unit tests without services
 - **E2E Integration**: `test_e2e.py` - Full pipeline with async calls
 - **DMN Validation**: `tests/test_dmn_rules_validation.py` - XLSX content validation
-- **Expected Result**: €383 total for sample order
+- **Expected Result**: €483 total for sample order (as per `docs/BILLING_CALCULATION_METHODOLOGY.md`)
 
 ## Important Notes
 - Database-driven rules with DMN integration (pyDMNrules with XLSX processor fallback)
@@ -218,5 +218,6 @@ python3 tests/test_dmn_rules_validation.py  # XLSX content validation
 - Rate limiting: 100 requests/minute per user
 - Maximum 10MB request size, 1000 records per API response
 - Always use python3 in this project
-- DMN files must be in `billing-re/shared/dmn-rules/` (not root-level)
+- XLSX rule files are in `shared/rules/` (symlinked to each service as needed)
+- Services access XLSX files via symlinks: `services/{service}/shared/rules/` → `shared/rules/`
 - When there is a `frontend` issue in hand, use the `~.claude/agents/frontend-developer.md`

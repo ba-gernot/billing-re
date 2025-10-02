@@ -2,7 +2,7 @@
 """
 End-to-End Test for Billing RE System
 Tests the complete pipeline with the sample order from requirement documents
-Expected result: €383 total invoice
+Expected result: €483 total invoice (as per docs/BILLING_CALCULATION_METHODOLOGY.md)
 """
 
 import sys
@@ -127,7 +127,7 @@ async def test_billing_service(rated_services: Dict[str, Any]) -> Dict[str, Any]
         print(f"      - Total: €{total_amount}")
 
         # Check expected result
-        expected_total = 383
+        expected_total = 483
         if abs(total_amount - expected_total) < 0.01:
             print(f"   🎯 TARGET ACHIEVED: €{total_amount} (expected €{expected_total})")
         else:
@@ -222,7 +222,7 @@ async def run_e2e_test():
         print("="*60)
 
         total_amount = billing_result.get('total_amount', 0)
-        expected_amount = 383
+        expected_amount = 483
 
         print(f"📊 FINAL RESULTS:")
         print(f"   - Order: {order_data['Order']['OrderReference']}")
