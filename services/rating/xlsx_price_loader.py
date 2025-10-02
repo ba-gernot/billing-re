@@ -452,24 +452,47 @@ class XLSXPriceLoader:
                 if not row[2] and not row[3] and not row[4]:
                     match_reasons.append("GENERIC_ROW")
 
-                # Station matches = +10 each
-                if departure_station and row[6] and str(row[6]) == str(departure_station):
-                    specificity += 10
-                    match_reasons.append(f"DepStn={row[6]}=+10")
-                if destination_station and row[8] and str(row[8]) == str(destination_station):
-                    specificity += 10
-                    match_reasons.append(f"DestStn={row[8]}=+10")
+                # Container Länge match (REQUIRED if specified in row)
+                if row[15]:  # Row has container length specified
+                    if container_length and str(row[15]) == str(container_length):
+                        specificity += 2
+                        match_reasons.append(f"Container={row[15]}=+2")
+                    else:
+                        # Row has specific container length that doesn't match - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Container length mismatch (row={row[15]}, need={container_length})")
+                        continue
 
-                # Optional matches
+                # Station matches - bidirectional (route A→B matches B→A)
+                row_dep = str(row[6]) if row[6] else None
+                row_dest = str(row[8]) if row[8] else None
+                json_dep = str(departure_station) if departure_station else None
+                json_dest = str(destination_station) if destination_station else None
+
+                # If row has BOTH stations specified, require route match (forward OR reverse)
+                if row_dep and row_dest:
+                    # Check for forward match (row dep → dest = JSON dep → dest)
+                    forward_match = (row_dep == json_dep and row_dest == json_dest) if (json_dep and json_dest) else False
+                    # Check for reverse match (row dep → dest = JSON dest → dep)
+                    reverse_match = (row_dep == json_dest and row_dest == json_dep) if (json_dep and json_dest) else False
+
+                    if forward_match:
+                        specificity += 20
+                        match_reasons.append(f"Route={row_dep}→{row_dest}=+20")
+                    elif reverse_match:
+                        specificity += 5
+                        match_reasons.append(f"RouteReverse={row_dep}→{row_dest}=+5")
+                    else:
+                        # Row has specific route that doesn't match (forward or reverse) - skip it
+                        logger.debug(f"   Row {row_idx}: ❌ Route mismatch (row={row_dep}→{row_dest}, need={json_dep}→{json_dest})")
+                        continue
+
+                # Optional matches (not required even if specified)
                 if loading_status and row[9] and str(row[9]) == loading_status:
                     specificity += 2
                     match_reasons.append(f"Loading={row[9]}=+2")
                 if transport_form and row[10] and str(row[10]) == transport_form:
                     specificity += 2
                     match_reasons.append(f"Transport={row[10]}=+2")
-                if container_length and row[15] and str(row[15]) == str(container_length):
-                    specificity += 2
-                    match_reasons.append(f"Container={row[15]}=+2")
 
                 # Date range validation
                 if service_date and row[16] and row[17]:

@@ -394,3 +394,70 @@ price_result = xlsx_price_loader.get_additional_service_price_advanced(
 ✅ **Expected total: €483**
 
 ---
+
+## Bug #6: Incorrect Row Selection for Services 111 and 456 ✅ FIXED
+
+### Problem
+After fixing freightpayer mapping, system calculated €508 instead of €483 (€25 over):
+- Service 111: €10 (should be €0 - stations don't match)
+- Service 456: €30 (should be €15 - wrong row selected)
+
+### Investigation
+**Service 111:**
+- XLSX Row 2: Stations 84005397→80205179 (JSON: 80155283→80137943) - NO MATCH
+- Container Länge=20 matches, but stations completely different
+- User requirement: "111 should be not taken under consideration at all since Bahnstellen do not match with the JSON"
+
+**Service 456:**
+- Row 13: Kundengruppe=30, Stations match, Container=20, €15 → Excluded (no customer group in JSON)
+- Row 14: No Kundengruppe, Stations match, Container=40, €30 → Excluded (Container mismatch)
+- Row 15: No Kundengruppe, Stations REVERSED (80137943→80155283), Container=20, €15 → Should match!
+- Row 16: No Kundengruppe, Stations reversed, Container=40, €30 → Excluded (Container mismatch)
+- User requirement: "456 should be chosen between row 13 and 15... since we also do not have a specific Kunden-gruppe, we should take row 15 with preis: 15"
+
+### Root Cause
+Station matching logic was incorrect:
+1. Initially made stations OPTIONAL (added specificity but didn't exclude) → Service 111 matched incorrectly
+2. Then made stations REQUIRED but only forward direction → Service 456 Row 15 excluded (reversed stations)
+
+### Fix Applied
+**File:** `services/rating/xlsx_price_loader.py:465-487`
+
+**Changes:**
+```python
+# Station matches - bidirectional (route A→B matches B→A)
+row_dep = str(row[6]) if row[6] else None
+row_dest = str(row[8]) if row[8] else None
+
+# If row has BOTH stations specified, require route match (forward OR reverse)
+if row_dep and row_dest:
+    forward_match = (row_dep == json_dep and row_dest == json_dest)
+    reverse_match = (row_dep == json_dest and row_dest == json_dep)
+
+    if forward_match:
+        specificity += 20  # Forward route match
+    elif reverse_match:
+        specificity += 5   # Reverse route match (lower priority)
+    else:
+        continue  # No route match - skip this row
+```
+
+**Key Logic:**
+1. ✅ **Container Länge**: REQUIRED when specified (must match exactly)
+2. ✅ **Route (both stations)**: REQUIRED when both specified (must match forward OR reverse)
+3. ✅ **Kundengruppe**: REQUIRED when specified (must match or be empty)
+4. ✅ **Loading/Transport**: OPTIONAL (adds specificity but doesn't exclude)
+
+### Impact
+✅ Service 111: All rows excluded (no route match forward or reverse) → €0 (was €10)
+✅ Service 456: Row 15 selected (reverse route match) → €15 (was €30)
+✅ **Total reduction: €25 (€10 + €15)**
+✅ **Expected calculation: €483**
+
+### Test Results
+```
+Service 111: None (no matches) ✅
+Service 456: Row 15, €15 (specificity=11: RouteReverse=+5, Container=+2, Loading=+2, Transport=+2) ✅
+```
+
+---
