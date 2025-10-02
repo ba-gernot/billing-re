@@ -301,6 +301,48 @@ export function OrderProcessorForm({ isOpen, onClose }: OrderProcessorFormProps)
                     </div>
                   )}
 
+                  {result.invoice?.line_items && result.invoice.line_items.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2 text-blue-600">Calculation Breakdown:</h4>
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded text-sm">
+                        <div className="space-y-1">
+                          {result.invoice.line_items.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <span className="font-medium">Service {item.service_code}:</span>{' '}
+                                <span className="text-gray-600">{item.service_name || item.description}</span>
+                                {item.quantity && item.quantity > 1 && (
+                                  <span className="text-gray-500 text-xs ml-1">
+                                    ({item.quantity} × €{item.unit_price?.toFixed(2)})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-mono font-medium ml-2">
+                                €{item.total_price?.toFixed(2) || item.calculated_amount?.toFixed(2) || '0.00'}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="border-t border-blue-300 mt-2 pt-2">
+                            <div className="flex justify-between font-medium">
+                              <span>Subtotal:</span>
+                              <span className="font-mono">€{result.invoice.subtotal?.toFixed(2) || '0.00'}</span>
+                            </div>
+                            {result.invoice.tax_calculation && (
+                              <div className="flex justify-between text-gray-600">
+                                <span>Tax ({result.invoice.tax_calculation.tax_case}):</span>
+                                <span className="font-mono">€{result.invoice.tax_calculation.tax_amount?.toFixed(2) || '0.00'}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-bold text-blue-700 text-base mt-1">
+                              <span>Total:</span>
+                              <span className="font-mono">€{result.invoice.total?.toFixed(2) || '0.00'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {result.warnings && result.warnings.length > 0 && (
                     <div>
                       <h4 className="font-medium mb-2 text-yellow-600">Warnings:</h4>
