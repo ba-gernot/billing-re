@@ -129,6 +129,76 @@ async def health_check():
     return {"status": "healthy", "service": "rating"}
 
 
+@app.get("/rules/{rule_type}")
+async def get_rules(rule_type: str):
+    """
+    Get rules from Excel files
+
+    rule_type: weight-class | service-determination | trip-type | tax-calculation | waiting-times | pricing-main | pricing-additional
+    """
+    import openpyxl
+    from pathlib import Path
+
+    # Map rule types to Excel files
+    rule_files = {
+        "weight-class": "5_Regeln_Gewichtsklassen.xlsx",
+        "service-determination": "4_Regeln_Leistungsermittlung.xlsx",
+        "trip-type": "3_Regeln_Fahrttyp.xlsx",
+        "tax-calculation": "3_1_Regeln_Steuerberechnung.xlsx",
+        "waiting-times": "3_Regeln_Wartezeiten.xlsx",
+        "pricing-main": "6_Preistabelle_Hauptleistungen_Einzelpreise.xlsx",
+        "pricing-additional": "6_Preistabelle_Nebenleistungen.xlsx"
+    }
+
+    if rule_type not in rule_files:
+        raise HTTPException(status_code=400, detail=f"Invalid rule type. Must be one of: {', '.join(rule_files.keys())}")
+
+    # Build path to Excel file
+    current_dir = Path(__file__).parent
+    excel_path = current_dir / "../../shared/rules" / rule_files[rule_type]
+
+    if not excel_path.exists():
+        raise HTTPException(status_code=404, detail=f"Rule file not found: {rule_files[rule_type]}")
+
+    try:
+        # Read Excel file
+        wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+        ws = wb[wb.sheetnames[0]]  # Get first sheet
+
+        # Convert to list of dictionaries
+        headers = []
+        rows = []
+
+        for i, row in enumerate(ws.iter_rows(values_only=True), 1):
+            if i == 1:
+                # First row is headers
+                headers = [str(cell).strip() if cell else f"Column_{idx}" for idx, cell in enumerate(row)]
+            else:
+                # Data rows
+                row_dict = {}
+                for idx, cell in enumerate(row):
+                    # Clean up cell values
+                    value = cell
+                    if isinstance(value, str):
+                        value = value.strip().strip('"')
+                    row_dict[headers[idx]] = value
+                rows.append(row_dict)
+
+        wb.close()
+
+        return {
+            "rule_type": rule_type,
+            "file_name": rule_files[rule_type],
+            "headers": headers,
+            "rows": rows,
+            "total_count": len(rows)
+        }
+
+    except Exception as e:
+        logger.error(f"Error reading Excel file {rule_files[rule_type]}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reading Excel file: {str(e)}")
+
+
 @app.post("/rate", response_model=RatingResult)
 async def rate_services(service_orders: List[ServiceOrderInput]):
     """

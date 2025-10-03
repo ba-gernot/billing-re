@@ -30,6 +30,7 @@ fastify.decorate('authenticate', authMiddleware);
 fastify.register(require('./routes/health'));
 fastify.register(require('./routes/auth'), { prefix: '/api/v1' });
 fastify.register(require('./routes/orders'), { prefix: '/api/v1' });
+fastify.register(require('./routes/rules'), { prefix: '/api/v1' });
 
 // Global error handler
 fastify.setErrorHandler(async (error, request, reply) => {

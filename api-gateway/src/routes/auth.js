@@ -72,7 +72,17 @@ async function routes(fastify) {
           type: 'object',
           properties: {
             token: { type: 'string' },
-            user: { type: 'object' },
+            user: {
+              type: 'object',
+              properties: {
+                userId: { type: 'string' },
+                email: { type: 'string' },
+                role: { type: 'string' },
+                name: { type: 'string' },
+                customerIds: { type: 'array', items: { type: 'string' } },
+                permissions: { type: 'object', additionalProperties: true }
+              }
+            },
             expiresIn: { type: 'string' },
             tokenType: { type: 'string' }
           }
