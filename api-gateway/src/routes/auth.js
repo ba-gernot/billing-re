@@ -190,8 +190,20 @@ async function routes(fastify) {
           type: 'object',
           properties: {
             valid: { type: 'boolean' },
-            user: { type: 'object' },
-            expiresAt: { type: 'string' }
+            user: {
+              type: 'object',
+              properties: {
+                userId: { type: 'string' },
+                email: { type: 'string' },
+                role: { type: 'string' },
+                customerIds: { type: 'array', items: { type: 'string' } },
+                permissions: { type: 'object', additionalProperties: true },
+                tokenIssuedAt: { type: 'string' },
+                tokenExpiresAt: { type: 'string' }
+              }
+            },
+            expiresAt: { type: 'string' },
+            message: { type: 'string' }
           }
         }
       }
